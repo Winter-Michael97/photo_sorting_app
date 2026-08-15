@@ -1,0 +1,56 @@
+Ordnerstruktur:
+lib/
+├─ main.dart
+├─ app.dart
+│
+├─ models/
+│  ├─ photo_item.dart
+│  ├─ study_condition.dart
+│  └─ sorting_decision.dart
+│
+├─ data/
+│  └─ photo_sets.dart
+│
+├─ screens/
+│  ├─ home_screen.dart
+│  ├─ instruction_screen.dart
+│  ├─ condition_select_screen.dart
+│  ├─ swipe_screen.dart
+│  ├─ grid_screen.dart
+│  ├─ questionnaire_screen.dart
+│  └─ result_screen.dart
+│
+├─ widgets/
+│  ├─ photo_card.dart
+│  ├─ progress_indicator_bar.dart
+│  └─ primary_button.dart
+│
+└─ services/
+   ├─ study_timer.dart
+   └─ result_exporter.dart
+
+main.dart bleibt nur der Startpunkt.
+
+app.dart enthält später MaterialApp, Theme und Routing.
+
+models/ sind eure Datenklassen:
+
+PhotoItem = einzelnes Foto
+StudyCondition = aktuelle Bedingung, z. B. Swipe + Kategorie A
+SortingDecision = Entscheidung der Versuchsperson für ein Foto
+
+data/ enthält erstmal feste Testdaten:
+
+photo_sets.dart = welche Fotos gehören zu welchem Set
+study_conditions.dart = Swipe A, Raster A, Swipe B, Raster B
+
+screens/ sind die einzelnen Seiten.
+
+Wichtig: Kein condition_select_screen.dart für die echte Studie.
+Die Reihenfolge macht später automatisch der study_flow_controller.dart.
+
+services/ ist für Logik, die nicht direkt UI ist:
+
+study_flow_controller.dart = welche Bedingung kommt als nächstes
+study_timer.dart = Zeitmessung
+result_exporter.dart = später CSV/JSON Export
