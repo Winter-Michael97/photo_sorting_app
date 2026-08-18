@@ -31,4 +31,4 @@ flutter:
     - assets/photos/series_b1/
     - assets/photos/series_b2/
 
-  uses-material-design: tru
+  uses-material-design: true
