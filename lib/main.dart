@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:photo_sorting_app/screens/condition_intro_screen.dart';
 
 import 'screens/start_screen.dart';
 
@@ -16,11 +17,18 @@ class MyApp extends StatelessWidget {
       title: 'Photo Triage Study',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(useMaterial3: true),
-      home: StartScreen(
+      home: ConditionIntroScreen(
+        conditionNumber: '1/4',
+        title: 'test',
+        description: 'test ',
+        instructions: ['test'],
+        onStart: () {},
+      ),
+
+      /*StartScreen(
         onStartStudy: (participantId) {
           debugPrint('Study started for participant: $participantId');
-        },
-      ),
+        },*/
     );
   }
 }
