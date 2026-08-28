@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:photo_sorting_app/screens/condition_complete_screen.dart';
 import 'package:photo_sorting_app/screens/condition_intro_screen.dart';
+import 'package:photo_sorting_app/screens/grid_independent_screen.dart';
 import 'package:photo_sorting_app/screens/study_complete_screen.dart';
 import 'package:photo_sorting_app/screens/swipe_independent_screen.dart';
 
@@ -20,11 +21,48 @@ class MyApp extends StatelessWidget {
       title: 'Photo Triage Study',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(useMaterial3: true),
-      home: StudyCompleteScreen(
+      home: GridIndependentScreen(
+        photos: const [
+          GridPhotoItem(
+            id: 'photo_01',
+            assetPath: 'assets/test_images/photo_01.jpg',
+          ),
+          GridPhotoItem(
+            id: 'photo_02',
+            assetPath: 'assets/test_images/photo_01.jpg',
+          ),
+          GridPhotoItem(
+            id: 'photo_03',
+            assetPath: 'assets/test_images/photo_01.jpg',
+          ),
+          GridPhotoItem(
+            id: 'photo_04',
+            assetPath: 'assets/test_images/photo_01.jpg',
+          ),
+          GridPhotoItem(
+            id: 'photo_05',
+            assetPath: 'assets/test_images/photo_01.jpg',
+          ),
+          GridPhotoItem(
+            id: 'photo_06',
+            assetPath: 'assets/test_images/photo_01.jpg',
+          ),
+        ],
+
+        onDecisionChanged: (photoId, previousDecision, newDecision) {
+          debugPrint('$photoId: $previousDecision -> $newDecision');
+        },
+
+        onConfirm: (decisions) {
+          debugPrint('RA bestätigt: $decisions');
+        },
+      ),
+
+      /*StudyCompleteScreen(
         participantId: 'participantId',
         totalConditions: 4,
         onExport: onExport,
-      ),
+      ),*/
 
       /*ConditionCompleteScreen(
         completedCondition: 1,
@@ -73,6 +111,7 @@ class MyApp extends StatelessWidget {
     );
   }
 
+  //wichtig gür study abschluss screen
   void onExport() {
     print('exported data');
   }
