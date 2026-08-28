@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:photo_sorting_app/screens/condition_complete_screen.dart';
 import 'package:photo_sorting_app/screens/condition_intro_screen.dart';
 import 'package:photo_sorting_app/screens/swipe_independent_screen.dart';
 
@@ -18,7 +19,15 @@ class MyApp extends StatelessWidget {
       title: 'Photo Triage Study',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(useMaterial3: true),
-      home: SwipeIndependentScreen(
+      home: ConditionCompleteScreen(
+        completedCondition: 1,
+        totalConditions: 4,
+        onContinue: () {
+          debugPrint('Weiter zur nächsten Condition');
+        },
+      ),
+
+      /*SwipeIndependentScreen(
         photoId: 'photo_01',
         photoAssetPath: 'assets/test_images/photo_01.jpg',
         currentIndex: 1,
@@ -38,6 +47,7 @@ class MyApp extends StatelessWidget {
 
         canUndo: true,
       ),
+      */
       //conditionintroscreen
       /*
       ConditionIntroScreen(
