@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:photo_sorting_app/screens/condition_complete_screen.dart';
 import 'package:photo_sorting_app/screens/condition_intro_screen.dart';
+import 'package:photo_sorting_app/screens/study_complete_screen.dart';
 import 'package:photo_sorting_app/screens/swipe_independent_screen.dart';
 
 import 'screens/start_screen.dart';
@@ -19,13 +20,19 @@ class MyApp extends StatelessWidget {
       title: 'Photo Triage Study',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(useMaterial3: true),
-      home: ConditionCompleteScreen(
+      home: StudyCompleteScreen(
+        participantId: 'participantId',
+        totalConditions: 4,
+        onExport: onExport,
+      ),
+
+      /*ConditionCompleteScreen(
         completedCondition: 1,
         totalConditions: 4,
         onContinue: () {
           debugPrint('Weiter zur nächsten Condition');
         },
-      ),
+      ),*/
 
       /*SwipeIndependentScreen(
         photoId: 'photo_01',
@@ -64,5 +71,9 @@ class MyApp extends StatelessWidget {
           debugPrint('Study started for participant: $participantId');
         },*/
     );
+  }
+
+  void onExport() {
+    print('exported data');
   }
 }
