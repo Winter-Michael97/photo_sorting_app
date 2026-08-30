@@ -26,9 +26,6 @@ dev_dependencies:
 # The following section is specific to Flutter packages.
 flutter:
   assets:
-    - assets/photos/clear_a1/
-    - assets/photos/clear_a2/
-    - assets/photos/series_b1/
-    - assets/photos/series_b2/
+    - assets/test_images/
 
-  uses-material-design: tru
+  uses-material-design: true
