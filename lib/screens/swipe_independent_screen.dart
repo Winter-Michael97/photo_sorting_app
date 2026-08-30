@@ -1,28 +1,23 @@
 import 'package:flutter/material.dart';
 
+import '../models/photo_item.dart';
+
 class SwipeIndependentScreen extends StatefulWidget {
-  final String photoId;
-  final String photoAssetPath;
+  final PhotoItem photo;
 
   final int currentIndex;
   final int totalCount;
 
-  final ValueChanged<String> onKeep;
-  final ValueChanged<String> onDiscard;
-  final VoidCallback onUndo;
-
-  final bool canUndo;
+  final ValueChanged<PhotoItem> onKeep;
+  final ValueChanged<PhotoItem> onDiscard;
 
   const SwipeIndependentScreen({
     super.key,
-    required this.photoId,
-    required this.photoAssetPath,
+    required this.photo,
     required this.currentIndex,
     required this.totalCount,
     required this.onKeep,
     required this.onDiscard,
-    required this.onUndo,
-    this.canUndo = false,
   });
 
   @override
@@ -45,26 +40,23 @@ class _SwipeIndependentScreenState extends State<SwipeIndependentScreen> {
     final velocity = details.primaryVelocity ?? 0;
 
     final discard = _dragX < -_swipeThreshold || velocity < -_velocityThreshold;
-
     final keep = _dragX > _swipeThreshold || velocity > _velocityThreshold;
 
-    // Foto zunächst wieder in Ausgangsposition setzen.
     setState(() {
       _dragX = 0;
     });
 
     if (discard) {
-      widget.onDiscard(widget.photoId);
+      widget.onDiscard(widget.photo);
     } else if (keep) {
-      widget.onKeep(widget.photoId);
+      widget.onKeep(widget.photo);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final progress = widget.totalCount == 0
-        ? 0.0
-        : widget.currentIndex / widget.totalCount;
+    final progress =
+        widget.totalCount == 0 ? 0.0 : widget.currentIndex / widget.totalCount;
 
     return Scaffold(
       body: SafeArea(
@@ -72,8 +64,6 @@ class _SwipeIndependentScreenState extends State<SwipeIndependentScreen> {
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              // Fortschritt........
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -94,7 +84,6 @@ class _SwipeIndependentScreenState extends State<SwipeIndependentScreen> {
 
               const SizedBox(height: 32),
 
-              // ---------- Foto ----------
               Expanded(
                 child: Center(
                   child: GestureDetector(
@@ -113,7 +102,7 @@ class _SwipeIndependentScreenState extends State<SwipeIndependentScreen> {
                         ),
                         clipBehavior: Clip.antiAlias,
                         child: Image.asset(
-                          widget.photoAssetPath,
+                          widget.photo.assetPath,
                           fit: BoxFit.contain,
                         ),
                       ),
@@ -124,7 +113,6 @@ class _SwipeIndependentScreenState extends State<SwipeIndependentScreen> {
 
               const SizedBox(height: 24),
 
-              // ---------- Swipe Erklärung ----------
               Row(
                 children: [
                   Expanded(
@@ -151,15 +139,6 @@ class _SwipeIndependentScreenState extends State<SwipeIndependentScreen> {
                     ),
                   ),
                 ],
-              ),
-
-              const SizedBox(height: 20),
-
-              // ---------- Undo ----------
-              TextButton.icon(
-                onPressed: widget.canUndo ? widget.onUndo : null,
-                icon: const Icon(Icons.undo),
-                label: const Text('Undo'),
               ),
             ],
           ),
