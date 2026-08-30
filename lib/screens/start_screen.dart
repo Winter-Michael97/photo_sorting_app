@@ -20,7 +20,7 @@ class _StartScreenState extends State<StartScreen> {
 
     if (participantId.isEmpty) {
       setState(() {
-        _errorMessage = 'Bitte eine Participant ID eingeben.';
+        _errorMessage = 'Bitte eine Teilnehmer-ID eingeben.';
       });
       return;
     }
@@ -56,7 +56,7 @@ class _StartScreenState extends State<StartScreen> {
                   const SizedBox(height: 24),
 
                   const Text(
-                    'Photo Triage Study',
+                    'Foto-Aussortierstudie',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                   ),
@@ -64,7 +64,7 @@ class _StartScreenState extends State<StartScreen> {
                   const SizedBox(height: 48),
 
                   const Text(
-                    'Participant ID',
+                    'Teilnehmer-ID',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
 
@@ -89,7 +89,7 @@ class _StartScreenState extends State<StartScreen> {
                     child: ElevatedButton(
                       onPressed: _startStudy,
                       child: const Text(
-                        'Start Study',
+                        'Studie starten',
                         style: TextStyle(fontSize: 17),
                       ),
                     ),
