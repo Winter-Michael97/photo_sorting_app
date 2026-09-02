@@ -34,10 +34,43 @@ class PhotoSortingApp extends StatelessWidget {
     return MaterialApp(
       title: 'Photo Sorting Study',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-      ),
+      theme: ThemeData(useMaterial3: true),
       home: const StudyAppShell(),
+      /*SubjectiveRatingScreen(
+  questions: const [
+    RatingQuestion(
+      id: 'ease',
+      text:
+          'Die Bedienung war einfach verständlich.',
+    ),
+    RatingQuestion(
+      id: 'control',
+      text:
+          'Ich hatte das Gefühl, die Kontrolle über meine Entscheidungen zu behalten.',
+    ),
+    RatingQuestion(
+      id: 'confidence',
+      text:
+          'Ich war mir bei meinen Entscheidungen sicher.',
+    ),
+    RatingQuestion(
+      id: 'workload',
+      text:
+          'Die Aufgabe war anstrengend.',
+    ),
+    RatingQuestion(
+      id: 'satisfaction',
+      text:
+          'Die Bedienung war angenehm.',
+    ),
+  ],
+
+  onSubmit: (answers) {
+    debugPrint(
+      'Ratings: $answers',
+    );
+  },
+) */
     );
   }
 }
@@ -121,19 +154,13 @@ class _StudyAppShellState extends State<StudyAppShell> {
   }
 
   void _handleSwipeKeep(PhotoItem photo) {
-    _saveDecision(
-      photoId: photo.id,
-      action: SortingAction.keep,
-    );
+    _saveDecision(photoId: photo.id, action: SortingAction.keep);
 
     _goToNextSwipePhoto();
   }
 
   void _handleSwipeDiscard(PhotoItem photo) {
-    _saveDecision(
-      photoId: photo.id,
-      action: SortingAction.discard,
-    );
+    _saveDecision(photoId: photo.id, action: SortingAction.discard);
 
     _goToNextSwipePhoto();
   }
@@ -160,20 +187,14 @@ class _StudyAppShellState extends State<StudyAppShell> {
 
   void _handleGridConfirm(Map<String, SortingAction> decisions) {
     for (final entry in decisions.entries) {
-      _saveDecision(
-        photoId: entry.key,
-        action: entry.value,
-      );
+      _saveDecision(photoId: entry.key, action: entry.value);
     }
 
     _finishCurrentCondition();
   }
 
   void _handleSwipeSeriesCompleted(String seriesId, PhotoItem selectedPhoto) {
-    _saveDecision(
-      photoId: selectedPhoto.id,
-      action: SortingAction.keep,
-    );
+    _saveDecision(photoId: selectedPhoto.id, action: SortingAction.keep);
 
     debugPrint(
       'Swipe-Serie abgeschlossen: $seriesId, Favorit: ${selectedPhoto.id}',
@@ -183,10 +204,7 @@ class _StudyAppShellState extends State<StudyAppShell> {
   }
 
   void _handleGridSeriesCompleted(String seriesId, PhotoItem selectedPhoto) {
-    _saveDecision(
-      photoId: selectedPhoto.id,
-      action: SortingAction.keep,
-    );
+    _saveDecision(photoId: selectedPhoto.id, action: SortingAction.keep);
 
     debugPrint(
       'Raster-Serie abgeschlossen: $seriesId, Favorit: ${selectedPhoto.id}',
@@ -207,10 +225,7 @@ class _StudyAppShellState extends State<StudyAppShell> {
     }
   }
 
-  void _saveDecision({
-    required String photoId,
-    required SortingAction action,
-  }) {
+  void _saveDecision({required String photoId, required SortingAction action}) {
     final decision = SortingDecision(
       participantId: _participantId ?? 'unknown',
       conditionId: _currentCondition.id,
@@ -279,9 +294,7 @@ class _StudyAppShellState extends State<StudyAppShell> {
   Widget build(BuildContext context) {
     switch (_currentStep) {
       case AppStep.start:
-        return StartScreen(
-          onStartStudy: _startStudy,
-        );
+        return StartScreen(onStartStudy: _startStudy);
 
       case AppStep.conditionIntro:
         return ConditionIntroScreen(
