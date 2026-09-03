@@ -13,6 +13,7 @@ import 'screens/grid_independent_screen.dart';
 import 'screens/swipe_series_screen.dart';
 import 'screens/grid_series_screen.dart';
 import 'screens/condition_complete_screen.dart';
+import 'screens/subjective_rating_screen.dart';
 import 'screens/study_complete_screen.dart';
 
 enum AppStep {
@@ -23,6 +24,7 @@ enum AppStep {
   swipeSeries,
   gridSeries,
   conditionComplete,
+  subjectiveRating,
   studyComplete,
 }
 
@@ -34,9 +36,7 @@ class PhotoSortingApp extends StatelessWidget {
     return MaterialApp(
       title: 'Photo Sorting Study',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-      ),
+      theme: ThemeData(useMaterial3: true),
       home: const StudyAppShell(),
     );
   }
@@ -60,10 +60,42 @@ class _StudyAppShellState extends State<StudyAppShell> {
 
   final List<SortingDecision> _decisions = [];
 
+  final Map<String, Map<String, int>> _subjectiveRatings = {};
+
   int get _totalConditions => studyConditions.length;
 
   StudyCondition get _currentCondition =>
       studyConditions[_currentConditionIndex];
+
+  List<RatingQuestion> get _currentRatingQuestions {
+    return [
+      const RatingQuestion(
+        id: 'ease',
+        text: 'Die Bedienung war einfach verständlich.',
+      ),
+      const RatingQuestion(
+        id: 'control',
+        text: 'Ich hatte das Gefühl, die Kontrolle über meine Entscheidungen zu behalten.',
+      ),
+      const RatingQuestion(
+        id: 'confidence',
+        text: 'Ich war mir bei meinen Entscheidungen sicher.',
+      ),
+      const RatingQuestion(
+        id: 'workload',
+        text: 'Die Aufgabe war anstrengend.',
+      ),
+      const RatingQuestion(
+        id: 'satisfaction',
+        text: 'Die Bedienung war angenehm.',
+      ),
+      if (_currentCondition.taskType == TaskType.series)
+        const RatingQuestion(
+          id: 'comparison',
+          text: 'Ich konnte die Fotos gut miteinander vergleichen.',
+        ),
+    ];
+  }
 
   List<List<PhotoItem>> get _currentSeriesGroups {
     final groupedPhotos = <String, List<PhotoItem>>{};
@@ -85,6 +117,7 @@ class _StudyAppShellState extends State<StudyAppShell> {
       _currentSwipePhotoIndex = 0;
       _currentSeriesIndex = 0;
       _decisions.clear();
+      _subjectiveRatings.clear();
       _currentStep = AppStep.conditionIntro;
     });
 
@@ -121,19 +154,13 @@ class _StudyAppShellState extends State<StudyAppShell> {
   }
 
   void _handleSwipeKeep(PhotoItem photo) {
-    _saveDecision(
-      photoId: photo.id,
-      action: SortingAction.keep,
-    );
+    _saveDecision(photoId: photo.id, action: SortingAction.keep);
 
     _goToNextSwipePhoto();
   }
 
   void _handleSwipeDiscard(PhotoItem photo) {
-    _saveDecision(
-      photoId: photo.id,
-      action: SortingAction.discard,
-    );
+    _saveDecision(photoId: photo.id, action: SortingAction.discard);
 
     _goToNextSwipePhoto();
   }
@@ -160,20 +187,14 @@ class _StudyAppShellState extends State<StudyAppShell> {
 
   void _handleGridConfirm(Map<String, SortingAction> decisions) {
     for (final entry in decisions.entries) {
-      _saveDecision(
-        photoId: entry.key,
-        action: entry.value,
-      );
+      _saveDecision(photoId: entry.key, action: entry.value);
     }
 
     _finishCurrentCondition();
   }
 
   void _handleSwipeSeriesCompleted(String seriesId, PhotoItem selectedPhoto) {
-    _saveDecision(
-      photoId: selectedPhoto.id,
-      action: SortingAction.keep,
-    );
+    _saveDecision(photoId: selectedPhoto.id, action: SortingAction.keep);
 
     debugPrint(
       'Swipe-Serie abgeschlossen: $seriesId, Favorit: ${selectedPhoto.id}',
@@ -183,10 +204,7 @@ class _StudyAppShellState extends State<StudyAppShell> {
   }
 
   void _handleGridSeriesCompleted(String seriesId, PhotoItem selectedPhoto) {
-    _saveDecision(
-      photoId: selectedPhoto.id,
-      action: SortingAction.keep,
-    );
+    _saveDecision(photoId: selectedPhoto.id, action: SortingAction.keep);
 
     debugPrint(
       'Raster-Serie abgeschlossen: $seriesId, Favorit: ${selectedPhoto.id}',
@@ -207,10 +225,7 @@ class _StudyAppShellState extends State<StudyAppShell> {
     }
   }
 
-  void _saveDecision({
-    required String photoId,
-    required SortingAction action,
-  }) {
+  void _saveDecision({required String photoId, required SortingAction action}) {
     final decision = SortingDecision(
       participantId: _participantId ?? 'unknown',
       conditionId: _currentCondition.id,
@@ -230,6 +245,35 @@ class _StudyAppShellState extends State<StudyAppShell> {
     });
 
     debugPrint('Condition ${_currentCondition.id} abgeschlossen.');
+  }
+
+  void _openSubjectiveRating() {
+    setState(() {
+      _currentStep = AppStep.subjectiveRating;
+    });
+  }
+
+  void _handleRatingSubmit(Map<String, int> answers) {
+    final conditionId = _currentCondition.id;
+
+    _subjectiveRatings[conditionId] = Map<String, int>.from(answers);
+
+    debugPrint('Ratings gespeichert für $conditionId: $answers');
+
+    final isLastCondition = _currentConditionIndex == _totalConditions - 1;
+
+    if (isLastCondition) {
+      setState(() {
+        _currentStep = AppStep.studyComplete;
+      });
+    } else {
+      setState(() {
+        _currentConditionIndex++;
+        _currentSwipePhotoIndex = 0;
+        _currentSeriesIndex = 0;
+        _currentStep = AppStep.conditionIntro;
+      });
+    }
   }
 
   void _continueAfterCondition() {
@@ -279,9 +323,7 @@ class _StudyAppShellState extends State<StudyAppShell> {
   Widget build(BuildContext context) {
     switch (_currentStep) {
       case AppStep.start:
-        return StartScreen(
-          onStartStudy: _startStudy,
-        );
+        return StartScreen(onStartStudy: _startStudy);
 
       case AppStep.conditionIntro:
         return ConditionIntroScreen(
@@ -375,7 +417,14 @@ class _StudyAppShellState extends State<StudyAppShell> {
         return ConditionCompleteScreen(
           completedCondition: _currentConditionIndex + 1,
           totalConditions: _totalConditions,
-          onContinue: _continueAfterCondition,
+          onContinue: _openSubjectiveRating,
+        );
+
+      case AppStep.subjectiveRating:
+        return SubjectiveRatingScreen(
+          key: ValueKey('rating_${_currentCondition.id}'),
+          questions: _currentRatingQuestions,
+          onSubmit: _handleRatingSubmit,
         );
 
       case AppStep.studyComplete:
