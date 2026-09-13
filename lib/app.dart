@@ -276,22 +276,6 @@ class _StudyAppShellState extends State<StudyAppShell> {
     }
   }
 
-  void _continueAfterCondition() {
-    final isLastCondition = _currentConditionIndex == _totalConditions - 1;
-
-    if (isLastCondition) {
-      setState(() {
-        _currentStep = AppStep.studyComplete;
-      });
-    } else {
-      setState(() {
-        _currentConditionIndex++;
-        _currentSwipePhotoIndex = 0;
-        _currentSeriesIndex = 0;
-        _currentStep = AppStep.conditionIntro;
-      });
-    }
-  }
 
   void _exportData() {
     debugPrint('--- EXPORT ---');
