@@ -10,7 +10,7 @@ class SwipeSeriesScreen extends StatefulWidget {
   final int totalSeriesCount;
 
   final void Function(String seriesId, PhotoItem selectedPhoto)
-  onSeriesCompleted;
+      onSeriesCompleted;
 
   const SwipeSeriesScreen({
     super.key,
@@ -26,8 +26,11 @@ class SwipeSeriesScreen extends StatefulWidget {
 }
 
 class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
-  int _candidateIndex = 1;
-  late PhotoItem _favorite;
+  late List<PhotoItem> _roundPhotos;
+  final List<PhotoItem> _keptForNextRound = [];
+
+  int _photoIndex = 0;
+  int _roundNumber = 1;
 
   double _dragX = 0;
 
@@ -42,19 +45,31 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
       throw ArgumentError('SwipeSeriesScreen braucht mindestens ein Foto.');
     }
 
-    _favorite = widget.photos.first;
+    _roundPhotos = List<PhotoItem>.from(widget.photos);
+
+    // Falls eine Serie ausnahmsweise nur ein Foto enthält, ist die Auswahl
+    // bereits eindeutig.
+    if (_roundPhotos.length == 1) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+
+        widget.onSeriesCompleted(widget.seriesId, _roundPhotos.first);
+      });
+    }
   }
 
-  PhotoItem get _currentCandidate => widget.photos[_candidateIndex];
+  PhotoItem get _currentPhoto => _roundPhotos[_photoIndex];
 
-  bool get _hasCandidate => _candidateIndex < widget.photos.length;
+  int get _remainingInRound => _roundPhotos.length - _photoIndex;
 
   double get _progress {
-    if (widget.photos.length <= 1) {
+    if (_roundPhotos.isEmpty) {
       return 1.0;
     }
 
-    return _candidateIndex / widget.photos.length;
+    return (_photoIndex + 1) / _roundPhotos.length;
   }
 
   void _handleDragUpdate(DragUpdateDetails details) {
@@ -66,60 +81,117 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
   void _handleDragEnd(DragEndDetails details) {
     final velocity = details.primaryVelocity ?? 0;
 
-    final discard = _dragX < -_swipeThreshold || velocity < -_velocityThreshold;
-    final choose = _dragX > _swipeThreshold || velocity > _velocityThreshold;
+    final discard =
+        _dragX < -_swipeThreshold || velocity < -_velocityThreshold;
+    final keep =
+        _dragX > _swipeThreshold || velocity > _velocityThreshold;
 
     setState(() {
       _dragX = 0;
     });
 
     if (discard) {
-      _discardCandidate();
-    } else if (choose) {
-      _chooseCandidateAsFavorite();
+      _discardCurrentPhoto();
+    } else if (keep) {
+      _keepCurrentPhoto();
     }
   }
 
-  void _discardCandidate() {
-    _goToNextCandidate();
+  void _discardCurrentPhoto() {
+    // Das letzte noch mögliche Foto darf nicht ebenfalls aussortiert werden.
+    // Beispiel: In dieser Runde wurde bisher kein Foto behalten und nur das
+    // aktuelle Foto ist noch übrig.
+    if (_keptForNextRound.isEmpty && _remainingInRound == 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Mindestens ein Foto muss übrig bleiben. '
+            'Behalte dieses Foto für die nächste Runde.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    _advanceAfterDecision();
   }
 
-  void _chooseCandidateAsFavorite() {
+  void _keepCurrentPhoto() {
+    _keptForNextRound.add(_currentPhoto);
+    _advanceAfterDecision();
+  }
+
+  void _advanceAfterDecision() {
+    final isLastPhotoInRound = _photoIndex == _roundPhotos.length - 1;
+
+    if (!isLastPhotoInRound) {
+      setState(() {
+        _photoIndex++;
+      });
+      return;
+    }
+
+    _finishRound();
+  }
+
+  void _finishRound() {
+    if (_keptForNextRound.isEmpty) {
+      // Sollte durch die Sperre in _discardCurrentPhoto nicht vorkommen.
+      return;
+    }
+
+    if (_keptForNextRound.length == 1) {
+      final selectedPhoto = _keptForNextRound.first;
+      widget.onSeriesCompleted(widget.seriesId, selectedPhoto);
+      return;
+    }
+
+    final nextRoundPhotos = List<PhotoItem>.from(_keptForNextRound);
+
     setState(() {
-      _favorite = _currentCandidate;
+      _roundPhotos = nextRoundPhotos;
+      _keptForNextRound.clear();
+      _photoIndex = 0;
+      _roundNumber++;
+      _dragX = 0;
     });
 
-    _goToNextCandidate();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${nextRoundPhotos.length} Fotos sind noch im Rennen. '
+          'Vergleiche sie erneut.',
+        ),
+        duration: const Duration(milliseconds: 1400),
+      ),
+    );
   }
 
-  void _goToNextCandidate() {
-    final nextIndex = _candidateIndex + 1;
-
-    if (nextIndex < widget.photos.length) {
-      setState(() {
-        _candidateIndex = nextIndex;
-      });
-    } else {
-      widget.onSeriesCompleted(widget.seriesId, _favorite);
+  Color? get _swipeHintColor {
+    if (_dragX <= -_swipeThreshold * 0.45) {
+      return Colors.red.withValues(alpha: 0.08);
     }
+
+    if (_dragX >= _swipeThreshold * 0.45) {
+      return Colors.green.withValues(alpha: 0.08);
+    }
+
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_hasCandidate) {
-      return Scaffold(
+    if (_roundPhotos.length == 1) {
+      return const Scaffold(
         body: SafeArea(
           child: Center(
-            child: Text(
-              'Ausgewähltes Foto: ${_favorite.id}',
-              textAlign: TextAlign.center,
-            ),
+            child: CircularProgressIndicator(),
           ),
         ),
       );
     }
 
-    final candidate = _currentCandidate;
+    final photo = _currentPhoto;
 
     return Scaffold(
       body: SafeArea(
@@ -127,20 +199,40 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              // ---------- Fortschritt ----------
+              // ---------- Serie / Runde ----------
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Serie ${widget.currentSeriesIndex} / ${widget.totalSeriesCount}',
+                    'Serie ${widget.currentSeriesIndex} / '
+                    '${widget.totalSeriesCount}',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   Text(
-                    'Vergleich ${_candidateIndex + 1} / ${widget.photos.length}',
-                    style: const TextStyle(fontSize: 16),
+                    'Runde $_roundNumber',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Foto ${_photoIndex + 1} / ${_roundPhotos.length}',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  Text(
+                    '${_keptForNextRound.length} behalten',
+                    style: const TextStyle(fontSize: 14),
                   ),
                 ],
               ),
@@ -149,57 +241,24 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
 
               LinearProgressIndicator(value: _progress),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
 
-              // ---------- Aktueller Favorit ----------
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.asset(
-                        _favorite.assetPath,
-                        width: 72,
-                        height: 72,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-
-                    const SizedBox(width: 12),
-
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Aktueller Favorit',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-
-                          const SizedBox(height: 4),
-
-                          Text(
-                            _favorite.id,
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+              Text(
+                _roundNumber == 1
+                    ? 'Behalte alle Fotos, die als möglicher Favorit '
+                        'weiter im Rennen bleiben sollen.'
+                    : 'Vergleiche die verbliebenen Fotos erneut und '
+                        'sortiere weitere aus.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade700,
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 18),
 
-              // ---------- Vergleichsfoto ----------
+              // ---------- Aktuelles Foto ----------
               Expanded(
                 child: Center(
                   child: GestureDetector(
@@ -210,15 +269,18 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
                       child: Container(
                         constraints: const BoxConstraints(
                           maxWidth: 500,
-                          maxHeight: 600,
+                          maxHeight: 640,
                         ),
                         decoration: BoxDecoration(
+                          color: _swipeHintColor,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade300),
+                          border: Border.all(
+                            color: Colors.grey.shade300,
+                          ),
                         ),
                         clipBehavior: Clip.antiAlias,
                         child: Image.asset(
-                          candidate.assetPath,
+                          photo.assetPath,
                           fit: BoxFit.contain,
                         ),
                       ),
@@ -227,17 +289,17 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
               Text(
-                'Vergleichsfoto: ${candidate.id}',
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
+                'Noch ${_remainingInRound - 1} Foto(s) danach in dieser Runde',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade600,
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
               // ---------- Swipe Erklärung ----------
               Row(
@@ -245,11 +307,16 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
                   Expanded(
                     child: Column(
                       children: const [
-                        Icon(Icons.arrow_back, size: 32),
+                        Icon(
+                          Icons.arrow_back,
+                          size: 32,
+                          color: Colors.redAccent,
+                        ),
                         SizedBox(height: 6),
                         Text(
-                          'Vergleichsfoto aussortieren',
+                          'Aussortieren',
                           textAlign: TextAlign.center,
+                          style: TextStyle(fontWeight: FontWeight.w600),
                         ),
                         Text(
                           'Swipe links',
@@ -268,11 +335,16 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
                   Expanded(
                     child: Column(
                       children: const [
-                        Icon(Icons.arrow_forward, size: 32),
+                        Icon(
+                          Icons.arrow_forward,
+                          size: 32,
+                          color: Colors.green,
+                        ),
                         SizedBox(height: 6),
                         Text(
-                          'Als neuen Favoriten wählen',
+                          'Behalten',
                           textAlign: TextAlign.center,
+                          style: TextStyle(fontWeight: FontWeight.w600),
                         ),
                         Text(
                           'Swipe rechts',
