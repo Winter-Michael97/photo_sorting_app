@@ -2,107 +2,73 @@ import '../models/photo_item.dart';
 import '../models/sorting_decision.dart';
 import '../models/study_condition.dart';
 
-const List<PhotoItem> swipeIndependentPhotos = [
-  PhotoItem(
-    id: 'swipe_photo_01',
-    assetPath: 'assets/test_images/photo_01.jpg',
-    expectedAction: SortingAction.keep,
-  ),
-  PhotoItem(
-    id: 'swipe_photo_02',
-    assetPath: 'assets/test_images/photo_01.jpg',
-    expectedAction: SortingAction.discard,
-  ),
-  PhotoItem(
-    id: 'swipe_photo_03',
-    assetPath: 'assets/test_images/photo_01.jpg',
-    expectedAction: SortingAction.keep,
-  ),
-  PhotoItem(
-    id: 'swipe_photo_04',
-    assetPath: 'assets/test_images/photo_01.jpg',
-    expectedAction: SortingAction.discard,
-  ),
-  PhotoItem(
-    id: 'swipe_photo_05',
-    assetPath: 'assets/test_images/photo_01.jpg',
-    expectedAction: SortingAction.keep,
-  ),
-];
+List<PhotoItem> _buildIndependentPhotos({
+  required String folder,
+  required String prefix,
+}) {
+  return List.generate(20, (index) {
+    final number = index + 1;
+    final numberStr = number.toString().padLeft(2, '0');
 
-const List<PhotoItem> gridIndependentPhotos = [
-  PhotoItem(
-    id: 'grid_photo_01',
-    assetPath: 'assets/test_images/photo_01.jpg',
-    expectedAction: SortingAction.keep,
-  ),
-  PhotoItem(
-    id: 'grid_photo_02',
-    assetPath: 'assets/test_images/photo_01.jpg',
-    expectedAction: SortingAction.discard,
-  ),
-  PhotoItem(
-    id: 'grid_photo_03',
-    assetPath: 'assets/test_images/photo_01.jpg',
-    expectedAction: SortingAction.keep,
-  ),
-  PhotoItem(
-    id: 'grid_photo_04',
-    assetPath: 'assets/test_images/photo_01.jpg',
-    expectedAction: SortingAction.discard,
-  ),
-  PhotoItem(
-    id: 'grid_photo_05',
-    assetPath: 'assets/test_images/photo_01.jpg',
-    expectedAction: SortingAction.keep,
-  ),
-  PhotoItem(
-    id: 'grid_photo_06',
-    assetPath: 'assets/test_images/photo_01.jpg',
-    expectedAction: SortingAction.discard,
-  ),
-];
+    return PhotoItem(
+      id: '${prefix}_$numberStr',
+      assetPath: 'assets/test_images/$folder/${prefix}_$numberStr.jpg',
+      expectedAction: number <= 10
+          ? SortingAction.keep
+          : SortingAction.discard,
+    );
+  });
+}
 
-const List<PhotoItem> seriesPlaceholderPhotos = [
-  PhotoItem(
-    id: 'series_01_01',
-    assetPath: 'assets/test_images/series/series_01_01.jpg',
-    seriesId: 'series_01',
-    isBestInSeries: false,
-  ),
-  PhotoItem(
-    id: 'series_01_02',
-    assetPath: 'assets/test_images/series/series_01_02.jpg',
-    seriesId: 'series_01',
-    isBestInSeries: false,
-  ),
-  PhotoItem(
-    id: 'series_01_03',
-    assetPath: 'assets/test_images/series/series_01_03.jpg',
-    seriesId: 'series_01',
-    isBestInSeries: true,
-  ),
-  PhotoItem(
-    id: 'series_01_04',
-    assetPath: 'assets/test_images/series/series_01_04.jpg',
-    seriesId: 'series_01',
-    isBestInSeries: false,
-  ),
-  PhotoItem(
-    id: 'series_01_05',
-    assetPath: 'assets/test_images/series/series_01_05.jpg',
-    seriesId: 'series_01',
-    isBestInSeries: false,
-  ),
-  PhotoItem(
-    id: 'series_01_06',
-    assetPath: 'assets/test_images/series/series_01_06.jpg',
-    seriesId: 'series_01',
-    isBestInSeries: false,
-  ),
-];
+List<PhotoItem> _buildSeriesPhotos({
+  required String folder,
+  required String prefix,
+}) {
+  final photos = <PhotoItem>[];
 
-const List<StudyCondition> studyConditions = [
+  for (int series = 1; series <= 6; series++) {
+    final seriesStr = series.toString().padLeft(2, '0');
+    final seriesId = '${prefix}_s$seriesStr';
+
+    for (int photo = 1; photo <= 5; photo++) {
+      final photoStr = photo.toString().padLeft(2, '0');
+
+      photos.add(
+        PhotoItem(
+          id: '${prefix}_s${seriesStr}_$photoStr',
+          assetPath:
+              'assets/test_images/$folder/${prefix}_s${seriesStr}_$photoStr.jpg',
+          seriesId: seriesId,
+          isBestInSeries: photo == 3,
+        ),
+      );
+    }
+  }
+
+  return photos;
+}
+
+final List<PhotoItem> clearA1Photos = _buildIndependentPhotos(
+  folder: 'clear_a1',
+  prefix: 'a1',
+);
+
+final List<PhotoItem> clearA2Photos = _buildIndependentPhotos(
+  folder: 'clear_a2',
+  prefix: 'a2',
+);
+
+final List<PhotoItem> seriesB1Photos = _buildSeriesPhotos(
+  folder: 'series_b1',
+  prefix: 'b1',
+);
+
+final List<PhotoItem> seriesB2Photos = _buildSeriesPhotos(
+  folder: 'series_b2',
+  prefix: 'b2',
+);
+
+final List<StudyCondition> studyConditions = [
   StudyCondition(
     id: 'SA',
     interfaceType: InterfaceType.swipe,
@@ -116,9 +82,8 @@ const List<StudyCondition> studyConditions = [
       'Arbeite möglichst zügig, aber trotzdem sorgfältig.',
       'Es gibt in der Studienversion kein Undo.',
     ],
-    photos: swipeIndependentPhotos,
+    photos: clearA1Photos,
   ),
-
   StudyCondition(
     id: 'RA',
     interfaceType: InterfaceType.grid,
@@ -132,38 +97,36 @@ const List<StudyCondition> studyConditions = [
       'Du kannst erst fortfahren, wenn alle Fotos bewertet wurden.',
       'Arbeite möglichst zügig, aber trotzdem sorgfältig.',
     ],
-    photos: gridIndependentPhotos,
+    photos: clearA2Photos,
   ),
-
   StudyCondition(
     id: 'SB',
     interfaceType: InterfaceType.swipe,
     taskType: TaskType.series,
     title: 'Swipe: Fotoserie',
     description:
-        'In dieser Aufgabe vergleichst du mehrere ähnliche Fotos nacheinander. Ziel ist es, aus der Serie genau ein bestes Foto auszuwählen.',
+        'In dieser Aufgabe vergleichst du mehrere ähnliche Fotos nacheinander. Ziel ist es, aus jeder Serie genau ein bestes Foto auszuwählen.',
     instructions: [
       'Das erste Foto ist automatisch der aktuelle Favorit.',
       'Swipe nach links = aktuelles Vergleichsfoto aussortieren.',
       'Swipe nach rechts = aktuelles Vergleichsfoto wird neuer Favorit.',
-      'Am Ende bleibt genau ein Favorit übrig.',
+      'Am Ende bleibt pro Serie genau ein Favorit übrig.',
     ],
-    photos: seriesPlaceholderPhotos,
+    photos: seriesB1Photos,
   ),
-
   StudyCondition(
     id: 'RB',
     interfaceType: InterfaceType.grid,
     taskType: TaskType.series,
     title: 'Raster: Fotoserie',
     description:
-        'In dieser Aufgabe siehst du mehrere ähnliche Fotos gleichzeitig. Ziel ist es, aus der Serie genau ein bestes Foto auszuwählen.',
+        'In dieser Aufgabe siehst du mehrere ähnliche Fotos gleichzeitig. Ziel ist es, aus jeder Serie genau ein bestes Foto auszuwählen.',
     instructions: [
       'Tippe auf das Foto, das du für das beste Foto der Serie hältst.',
       'Es kann immer nur ein Foto ausgewählt sein.',
       'Du kannst deine Auswahl ändern, bevor du bestätigst.',
       'Bestätige deine Auswahl, um zur nächsten Serie zu gelangen.',
     ],
-    photos: seriesPlaceholderPhotos,
+    photos: seriesB2Photos,
   ),
 ];

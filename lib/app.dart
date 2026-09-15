@@ -5,6 +5,8 @@ import 'data/study_conditions.dart';
 import 'models/photo_item.dart';
 import 'models/sorting_decision.dart';
 import 'models/study_condition.dart';
+import 'models/study_session_info.dart';
+import 'models/condition_timing.dart';
 
 import 'screens/start_screen.dart';
 import 'screens/condition_intro_screen.dart';
@@ -15,6 +17,8 @@ import 'screens/grid_series_screen.dart';
 import 'screens/condition_complete_screen.dart';
 import 'screens/subjective_rating_screen.dart';
 import 'screens/study_complete_screen.dart';
+
+import 'services/firestore_service.dart';
 
 enum AppStep {
   start,
@@ -52,20 +56,31 @@ class StudyAppShell extends StatefulWidget {
 class _StudyAppShellState extends State<StudyAppShell> {
   AppStep _currentStep = AppStep.start;
 
-  String? _participantId;
+  StudySessionInfo? _sessionInfo;
 
   int _currentConditionIndex = 0;
   int _currentSwipePhotoIndex = 0;
   int _currentSeriesIndex = 0;
 
+  List<StudyCondition> _conditionOrder = List.of(studyConditions);
+  int _counterbalanceGroup = 1;
+
   final List<SortingDecision> _decisions = [];
-
   final Map<String, Map<String, int>> _subjectiveRatings = {};
+  final List<ConditionTiming> _conditionTimings = [];
 
-  int get _totalConditions => studyConditions.length;
+  final FirestoreService _firestoreService = FirestoreService();
+
+  static const String _appVersion = '0.1.0';
+
+  bool _isExporting = false;
+
+  DateTime? _currentConditionStartedAt;
+
+  int get _totalConditions => _conditionOrder.length;
 
   StudyCondition get _currentCondition =>
-      studyConditions[_currentConditionIndex];
+      _conditionOrder[_currentConditionIndex];
 
   List<RatingQuestion> get _currentRatingQuestions {
     return [
@@ -75,7 +90,8 @@ class _StudyAppShellState extends State<StudyAppShell> {
       ),
       const RatingQuestion(
         id: 'control',
-        text: 'Ich hatte das Gefühl, die Kontrolle über meine Entscheidungen zu behalten.',
+        text:
+            'Ich hatte das Gefühl, die Kontrolle über meine Entscheidungen zu behalten.',
       ),
       const RatingQuestion(
         id: 'confidence',
@@ -110,18 +126,120 @@ class _StudyAppShellState extends State<StudyAppShell> {
     return groupedPhotos.values.toList();
   }
 
-  void _startStudy(String participantId) {
+  StudyCondition _copyConditionWithPhotos(
+    StudyCondition condition,
+    List<PhotoItem> photos,
+  ) {
+    return StudyCondition(
+      id: condition.id,
+      interfaceType: condition.interfaceType,
+      taskType: condition.taskType,
+      title: condition.title,
+      description: condition.description,
+      instructions: condition.instructions,
+      photos: photos,
+    );
+  }
+
+  List<StudyCondition> _buildCounterbalancedStudyConditions(int group) {
+    final saBase = studyConditions.firstWhere((condition) => condition.id == 'SA');
+    final raBase = studyConditions.firstWhere((condition) => condition.id == 'RA');
+    final sbBase = studyConditions.firstWhere((condition) => condition.id == 'SB');
+    final rbBase = studyConditions.firstWhere((condition) => condition.id == 'RB');
+
+    final normalSetAssignment = group == 1 || group == 3;
+
+    final sa = _copyConditionWithPhotos(
+      saBase,
+      normalSetAssignment ? clearA1Photos : clearA2Photos,
+    );
+
+    final ra = _copyConditionWithPhotos(
+      raBase,
+      normalSetAssignment ? clearA2Photos : clearA1Photos,
+    );
+
+    final sb = _copyConditionWithPhotos(
+      sbBase,
+      normalSetAssignment ? seriesB1Photos : seriesB2Photos,
+    );
+
+    final rb = _copyConditionWithPhotos(
+      rbBase,
+      normalSetAssignment ? seriesB2Photos : seriesB1Photos,
+    );
+
+    switch (group) {
+      case 1:
+        return [sa, ra, rb, sb];
+      case 2:
+        return [ra, sb, sa, rb];
+      case 3:
+        return [sb, rb, ra, sa];
+      case 4:
+        return [rb, sa, sb, ra];
+      default:
+        return [sa, ra, rb, sb];
+    }
+  }
+
+  int _getCounterbalanceGroup(String participantId) {
+    final match = RegExp(r'\d+').firstMatch(participantId);
+
+    if (match == null) {
+      return 1;
+    }
+
+    final participantNumber = int.tryParse(match.group(0)!);
+
+    if (participantNumber == null || participantNumber <= 0) {
+      return 1;
+    }
+
+    return ((participantNumber - 1) % 4) + 1;
+  }
+
+  Future<void> _startStudy({
+    required String deviceId,
+    required String testerId,
+  }) async {
+    final participantId = await _firestoreService.getNextParticipantId();
+
+    final sessionInfo = StudySessionInfo(
+      participantId: participantId,
+      deviceId: deviceId,
+      testerId: testerId,
+    );
+
+    final group = _getCounterbalanceGroup(participantId);
+    final conditionOrder = _buildCounterbalancedStudyConditions(group);
+
     setState(() {
-      _participantId = participantId;
+      _sessionInfo = sessionInfo;
+      _counterbalanceGroup = group;
+      _conditionOrder = conditionOrder;
+
       _currentConditionIndex = 0;
       _currentSwipePhotoIndex = 0;
       _currentSeriesIndex = 0;
+
       _decisions.clear();
       _subjectiveRatings.clear();
+      _conditionTimings.clear();
+
+      _currentConditionStartedAt = null;
+      _isExporting = false;
+
       _currentStep = AppStep.conditionIntro;
     });
 
     debugPrint('Studie gestartet: $participantId');
+    debugPrint('Gerät: $deviceId');
+    debugPrint('Versuchsleiter: $testerId');
+    debugPrint('Counterbalance-Gruppe: $group');
+    debugPrint(
+      'Reihenfolge: ${conditionOrder.map((condition) => condition.id).join(' -> ')}',
+    );
   }
 
   void _startCurrentCondition() {
@@ -130,6 +248,7 @@ class _StudyAppShellState extends State<StudyAppShell> {
     setState(() {
       _currentSwipePhotoIndex = 0;
       _currentSeriesIndex = 0;
+      _currentConditionStartedAt = DateTime.now();
 
       if (condition.interfaceType == InterfaceType.swipe &&
           condition.taskType == TaskType.independent) {
@@ -154,14 +273,12 @@ class _StudyAppShellState extends State<StudyAppShell> {
   }
 
   void _handleSwipeKeep(PhotoItem photo) {
-    _saveDecision(photoId: photo.id, action: SortingAction.keep);
-
+    _saveDecision(photo: photo, action: SortingAction.keep);
     _goToNextSwipePhoto();
   }
 
   void _handleSwipeDiscard(PhotoItem photo) {
-    _saveDecision(photoId: photo.id, action: SortingAction.discard);
-
+    _saveDecision(photo: photo, action: SortingAction.discard);
     _goToNextSwipePhoto();
   }
 
@@ -187,14 +304,21 @@ class _StudyAppShellState extends State<StudyAppShell> {
 
   void _handleGridConfirm(Map<String, SortingAction> decisions) {
     for (final entry in decisions.entries) {
-      _saveDecision(photoId: entry.key, action: entry.value);
+      final photo = _findCurrentPhotoById(entry.key);
+
+      if (photo == null) {
+        debugPrint('Foto nicht gefunden: ${entry.key}');
+        continue;
+      }
+
+      _saveDecision(photo: photo, action: entry.value);
     }
 
     _finishCurrentCondition();
   }
 
   void _handleSwipeSeriesCompleted(String seriesId, PhotoItem selectedPhoto) {
-    _saveDecision(photoId: selectedPhoto.id, action: SortingAction.keep);
+    _saveDecision(photo: selectedPhoto, action: SortingAction.keep);
 
     debugPrint(
       'Swipe-Serie abgeschlossen: $seriesId, Favorit: ${selectedPhoto.id}',
@@ -204,7 +328,7 @@ class _StudyAppShellState extends State<StudyAppShell> {
   }
 
   void _handleGridSeriesCompleted(String seriesId, PhotoItem selectedPhoto) {
-    _saveDecision(photoId: selectedPhoto.id, action: SortingAction.keep);
+    _saveDecision(photo: selectedPhoto, action: SortingAction.keep);
 
     debugPrint(
       'Raster-Serie abgeschlossen: $seriesId, Favorit: ${selectedPhoto.id}',
@@ -225,12 +349,45 @@ class _StudyAppShellState extends State<StudyAppShell> {
     }
   }
 
-  void _saveDecision({required String photoId, required SortingAction action}) {
+  PhotoItem? _findCurrentPhotoById(String photoId) {
+    for (final photo in _currentCondition.photos) {
+      if (photo.id == photoId) {
+        return photo;
+      }
+    }
+
+    return null;
+  }
+
+  void _saveDecision({
+    required PhotoItem photo,
+    required SortingAction action,
+  }) {
+    final condition = _currentCondition;
+
+    bool? isCorrect;
+
+    if (condition.taskType == TaskType.independent &&
+        photo.expectedAction != null) {
+      isCorrect = action == photo.expectedAction;
+    }
+
+    if (condition.taskType == TaskType.series) {
+      isCorrect = photo.isBestInSeries;
+    }
+
     final decision = SortingDecision(
-      participantId: _participantId ?? 'unknown',
-      conditionId: _currentCondition.id,
-      photoId: photoId,
+      participantId: _sessionInfo?.participantId ?? 'unknown',
+      conditionId: condition.id,
+      interfaceType: condition.interfaceType.name,
+      taskType: condition.taskType.name,
+      photoId: photo.id,
+      seriesId: photo.seriesId,
       action: action,
+      expectedAction: photo.expectedAction,
+      isBestInSeries:
+          condition.taskType == TaskType.series ? photo.isBestInSeries : null,
+      isCorrect: isCorrect,
       timestamp: DateTime.now(),
     );
 
@@ -240,11 +397,29 @@ class _StudyAppShellState extends State<StudyAppShell> {
   }
 
   void _finishCurrentCondition() {
+    final condition = _currentCondition;
+    final endedAt = DateTime.now();
+    final startedAt = _currentConditionStartedAt ?? endedAt;
+
+    final timing = ConditionTiming(
+      conditionId: condition.id,
+      interfaceType: condition.interfaceType.name,
+      taskType: condition.taskType.name,
+      startedAt: startedAt,
+      endedAt: endedAt,
+      durationMs: endedAt.difference(startedAt).inMilliseconds,
+    );
+
+    _conditionTimings.add(timing);
+    _currentConditionStartedAt = null;
+
     setState(() {
       _currentStep = AppStep.conditionComplete;
     });
 
-    debugPrint('Condition ${_currentCondition.id} abgeschlossen.');
+    debugPrint(
+      'Condition ${condition.id} abgeschlossen. Dauer: ${timing.durationMs} ms',
+    );
   }
 
   void _openSubjectiveRating() {
@@ -276,29 +451,68 @@ class _StudyAppShellState extends State<StudyAppShell> {
     }
   }
 
-  void _continueAfterCondition() {
-    final isLastCondition = _currentConditionIndex == _totalConditions - 1;
-
-    if (isLastCondition) {
-      setState(() {
-        _currentStep = AppStep.studyComplete;
-      });
-    } else {
-      setState(() {
-        _currentConditionIndex++;
-        _currentSwipePhotoIndex = 0;
-        _currentSeriesIndex = 0;
-        _currentStep = AppStep.conditionIntro;
-      });
+  Future<void> _exportData() async {
+    if (_isExporting) {
+      return;
     }
-  }
 
-  void _exportData() {
-    debugPrint('--- EXPORT ---');
-    debugPrint('participantId,conditionId,photoId,action,timestamp');
+    final sessionInfo = _sessionInfo;
 
-    for (final decision in _decisions) {
-      debugPrint(decision.toCsvRow());
+    if (sessionInfo == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Keine Studiensitzung gefunden. Bitte neu starten.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isExporting = true;
+    });
+
+    try {
+      final documentId = await _firestoreService.saveStudyRun(
+        participantId: sessionInfo.participantId,
+        deviceId: sessionInfo.deviceId,
+        testerId: sessionInfo.testerId,
+        appVersion: _appVersion,
+        counterbalanceGroup: _counterbalanceGroup,
+        conditionOrder: _conditionOrder,
+        decisions: _decisions,
+        subjectiveRatings: _subjectiveRatings,
+        conditionTimings: _conditionTimings,
+      );
+
+      debugPrint('Studienlauf gespeichert: $documentId');
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Daten gespeichert: $documentId'),
+        ),
+      );
+    } catch (error) {
+      debugPrint('Fehler beim Speichern: $error');
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Fehler beim Speichern: $error'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
     }
   }
 
@@ -429,7 +643,7 @@ class _StudyAppShellState extends State<StudyAppShell> {
 
       case AppStep.studyComplete:
         return StudyCompleteScreen(
-          participantId: _participantId ?? 'unknown',
+          participantId: _sessionInfo?.participantId ?? 'unknown',
           totalConditions: _totalConditions,
           onExport: _exportData,
         );

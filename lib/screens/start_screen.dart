@@ -1,41 +1,55 @@
 import 'package:flutter/material.dart';
 
 class StartScreen extends StatefulWidget {
-  final void Function(String participantId) onStartStudy;
+  final Future<void> Function({
+    required String deviceId,
+    required String testerId,
+  }) onStartStudy;
 
-  const StartScreen({super.key, required this.onStartStudy});
+  const StartScreen({
+    super.key,
+    required this.onStartStudy,
+  });
 
   @override
   State<StartScreen> createState() => _StartScreenState();
 }
 
 class _StartScreenState extends State<StartScreen> {
-  final TextEditingController _participantIdController =
-      TextEditingController();
+  String _selectedDeviceId = 'phone_1';
+  String _selectedTesterId = 'michael';
 
+  bool _isStarting = false;
   String? _errorMessage;
 
-  void _startStudy() {
-    final participantId = _participantIdController.text.trim();
-
-    if (participantId.isEmpty) {
-      setState(() {
-        _errorMessage = 'Bitte eine Teilnehmer-ID eingeben.';
-      });
+  Future<void> _startStudy() async {
+    if (_isStarting) {
       return;
     }
 
     setState(() {
+      _isStarting = true;
       _errorMessage = null;
     });
 
-    widget.onStartStudy(participantId);
-  }
+    try {
+      await widget.onStartStudy(
+        deviceId: _selectedDeviceId,
+        testerId: _selectedTesterId,
+      );
+    } catch (error) {
+      debugPrint('Fehler beim Studienstart: $error');
 
-  @override
-  void dispose() {
-    _participantIdController.dispose();
-    super.dispose();
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isStarting = false;
+        _errorMessage =
+            'Studie konnte nicht gestartet werden. Bitte erneut versuchen.';
+      });
+    }
   }
 
   @override
@@ -58,40 +72,121 @@ class _StartScreenState extends State<StartScreen> {
                   const Text(
                     'Foto-Aussortierstudie',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
 
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 40),
 
                   const Text(
-                    'Teilnehmer-ID',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    'Gerät',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
 
                   const SizedBox(height: 8),
 
-                  TextField(
-                    controller: _participantIdController,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      hintText: 'z. B. P001',
-                      border: const OutlineInputBorder(),
-                      errorText: _errorMessage,
+                  DropdownButtonFormField<String>(
+                    value: _selectedDeviceId,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
                     ),
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _startStudy(),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'phone_1',
+                        child: Text('phone_1'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'phone_2',
+                        child: Text('phone_2'),
+                      ),
+                    ],
+                    onChanged: _isStarting
+                        ? null
+                        : (value) {
+                            if (value == null) {
+                              return;
+                            }
+
+                            setState(() {
+                              _selectedDeviceId = value;
+                            });
+                          },
                   ),
 
                   const SizedBox(height: 24),
 
+                  const Text(
+                    'Versuchsleiter',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  DropdownButtonFormField<String>(
+                    value: _selectedTesterId,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'michael',
+                        child: Text('Michael'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'kollege',
+                        child: Text('Kollege'),
+                      ),
+                    ],
+                    onChanged: _isStarting
+                        ? null
+                        : (value) {
+                            if (value == null) {
+                              return;
+                            }
+
+                            setState(() {
+                              _selectedTesterId = value;
+                            });
+                          },
+                  ),
+
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 20),
+                    Text(
+                      _errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 32),
+
                   SizedBox(
                     height: 52,
                     child: ElevatedButton(
-                      onPressed: _startStudy,
-                      child: const Text(
-                        'Studie starten',
-                        style: TextStyle(fontSize: 17),
-                      ),
+                      onPressed: _isStarting ? null : _startStudy,
+                      child: _isStarting
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text(
+                              'Studie starten',
+                              style: TextStyle(fontSize: 17),
+                            ),
                     ),
                   ),
                 ],

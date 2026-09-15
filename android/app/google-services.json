@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "120199663680",
+    "project_id": "photo-sorting-study",
+    "storage_bucket": "photo-sorting-study.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:120199663680:android:78cdd148ae2ecdea5c8fa5",
+        "android_client_info": {
+          "package_name": "com.example.photo_sorting_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8MPkFrB5YofXHi2xFPaqN4McbtgxhwFc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
