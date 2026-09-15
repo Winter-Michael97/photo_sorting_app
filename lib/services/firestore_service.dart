@@ -56,6 +56,8 @@ class FirestoreService {
     required List<SortingDecision> decisions,
     required Map<String, Map<String, int>> subjectiveRatings,
     required List<ConditionTiming> conditionTimings,
+    required Map<String, dynamic> finalQuestionnaire,
+    required Map<String, dynamic> demographics,
   }) async {
     final docRef = await _firestore.collection('study_runs').add({
       'participantId': participantId,
@@ -63,6 +65,8 @@ class FirestoreService {
       'testerId': testerId,
       'appVersion': appVersion,
       'counterbalanceGroup': counterbalanceGroup,
+      'finalQuestionnaire': finalQuestionnaire,
+      'demographics': demographics,
       'createdAt': FieldValue.serverTimestamp(),
 
       'conditionOrder': conditionOrder.map((condition) {

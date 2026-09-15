@@ -130,3 +130,94 @@ final List<StudyCondition> studyConditions = [
     photos: seriesB2Photos,
   ),
 ];
+
+StudyCondition _copyConditionWithPhotos(
+  StudyCondition condition,
+  List<PhotoItem> photos,
+) {
+  return StudyCondition(
+    id: condition.id,
+    interfaceType: condition.interfaceType,
+    taskType: condition.taskType,
+    title: condition.title,
+    description: condition.description,
+    instructions: condition.instructions,
+    photos: photos,
+  );
+}
+
+List<StudyCondition> buildCounterbalancedStudyConditions(int group) {
+  final saBase = studyConditions.firstWhere((c) => c.id == 'SA');
+  final raBase = studyConditions.firstWhere((c) => c.id == 'RA');
+  final sbBase = studyConditions.firstWhere((c) => c.id == 'SB');
+  final rbBase = studyConditions.firstWhere((c) => c.id == 'RB');
+
+  // Gruppe 1 und 3:
+  // Swipe bekommt A1/B1, Raster bekommt A2/B2
+  //
+  // Gruppe 2 und 4:
+  // Swipe bekommt A2/B2, Raster bekommt A1/B1
+  final bool normalSetAssignment = group == 1 || group == 3;
+
+  final sa = _copyConditionWithPhotos(
+    saBase,
+    normalSetAssignment ? clearA1Photos : clearA2Photos,
+  );
+
+  final ra = _copyConditionWithPhotos(
+    raBase,
+    normalSetAssignment ? clearA2Photos : clearA1Photos,
+  );
+
+  final sb = _copyConditionWithPhotos(
+    sbBase,
+    normalSetAssignment ? seriesB1Photos : seriesB2Photos,
+  );
+
+  final rb = _copyConditionWithPhotos(
+    rbBase,
+    normalSetAssignment ? seriesB2Photos : seriesB1Photos,
+  );
+
+  switch (group) {
+    case 1:
+      return [
+        sa,
+        ra,
+        rb,
+        sb,
+      ];
+
+    case 2:
+      return [
+        ra,
+        sb,
+        sa,
+        rb,
+      ];
+
+    case 3:
+      return [
+        sb,
+        rb,
+        ra,
+        sa,
+      ];
+
+    case 4:
+      return [
+        rb,
+        sa,
+        sb,
+        ra,
+      ];
+
+    default:
+      return [
+        sa,
+        ra,
+        rb,
+        sb,
+      ];
+  }
+}

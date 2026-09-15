@@ -16,6 +16,8 @@ import 'screens/swipe_series_screen.dart';
 import 'screens/grid_series_screen.dart';
 import 'screens/condition_complete_screen.dart';
 import 'screens/subjective_rating_screen.dart';
+import 'screens/final_questionnaire_screen.dart';
+import 'screens/demographics_screen.dart';
 import 'screens/study_complete_screen.dart';
 
 import 'services/firestore_service.dart';
@@ -29,6 +31,8 @@ enum AppStep {
   gridSeries,
   conditionComplete,
   subjectiveRating,
+  finalQuestionnaire,
+  demographics,
   studyComplete,
 }
 
@@ -68,6 +72,8 @@ class _StudyAppShellState extends State<StudyAppShell> {
   final List<SortingDecision> _decisions = [];
   final Map<String, Map<String, int>> _subjectiveRatings = {};
   final List<ConditionTiming> _conditionTimings = [];
+  final Map<String, dynamic> _finalQuestionnaire = {};
+  final Map<String, dynamic> _demographics = {};
 
   final FirestoreService _firestoreService = FirestoreService();
 
@@ -226,6 +232,8 @@ class _StudyAppShellState extends State<StudyAppShell> {
       _decisions.clear();
       _subjectiveRatings.clear();
       _conditionTimings.clear();
+      _finalQuestionnaire.clear();
+      _demographics.clear();
 
       _currentConditionStartedAt = null;
       _isExporting = false;
@@ -439,7 +447,7 @@ class _StudyAppShellState extends State<StudyAppShell> {
 
     if (isLastCondition) {
       setState(() {
-        _currentStep = AppStep.studyComplete;
+        _currentStep = AppStep.finalQuestionnaire;
       });
     } else {
       setState(() {
@@ -451,20 +459,41 @@ class _StudyAppShellState extends State<StudyAppShell> {
     }
   }
 
-  Future<void> _exportData() async {
+  void _handleFinalQuestionnaireSubmit(
+    Map<String, dynamic> answers,
+  ) {
+    setState(() {
+      _finalQuestionnaire
+        ..clear()
+        ..addAll(answers);
+      _currentStep = AppStep.demographics;
+    });
+
+    debugPrint(
+      'Abschlussfragebogen gespeichert: $_finalQuestionnaire',
+    );
+  }
+
+  void _handleDemographicsSubmit(Map<String, dynamic> demographics) {
+    setState(() {
+      _demographics
+        ..clear()
+        ..addAll(demographics);
+      _currentStep = AppStep.studyComplete;
+    });
+
+    debugPrint('Demografische Daten gespeichert: $_demographics');
+  }
+
+  Future<bool> _exportData() async {
     if (_isExporting) {
-      return;
+      return false;
     }
 
     final sessionInfo = _sessionInfo;
 
     if (sessionInfo == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Keine Studiensitzung gefunden. Bitte neu starten.'),
-        ),
-      );
-      return;
+      return false;
     }
 
     setState(() {
@@ -482,31 +511,16 @@ class _StudyAppShellState extends State<StudyAppShell> {
         decisions: _decisions,
         subjectiveRatings: _subjectiveRatings,
         conditionTimings: _conditionTimings,
+        finalQuestionnaire:
+            Map<String, dynamic>.from(_finalQuestionnaire),
+        demographics: Map<String, dynamic>.from(_demographics),
       );
 
       debugPrint('Studienlauf gespeichert: $documentId');
-
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Daten gespeichert: $documentId'),
-        ),
-      );
+      return true;
     } catch (error) {
       debugPrint('Fehler beim Speichern: $error');
-
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Fehler beim Speichern: $error'),
-        ),
-      );
+      return false;
     } finally {
       if (mounted) {
         setState(() {
@@ -641,11 +655,26 @@ class _StudyAppShellState extends State<StudyAppShell> {
           onSubmit: _handleRatingSubmit,
         );
 
+      case AppStep.finalQuestionnaire:
+        return FinalQuestionnaireScreen(
+          key: ValueKey(
+            'final_questionnaire_${_sessionInfo?.participantId ?? 'unknown'}',
+          ),
+          onSubmit: _handleFinalQuestionnaireSubmit,
+        );
+
+      case AppStep.demographics:
+        return DemographicsScreen(
+          key: ValueKey('demographics_${_sessionInfo?.participantId ?? 'unknown'}'),
+          onSubmit: _handleDemographicsSubmit,
+        );
+
       case AppStep.studyComplete:
         return StudyCompleteScreen(
+          key: ValueKey('complete_${_sessionInfo?.participantId ?? 'unknown'}'),
           participantId: _sessionInfo?.participantId ?? 'unknown',
           totalConditions: _totalConditions,
-          onExport: _exportData,
+          onSave: _exportData,
         );
     }
   }
