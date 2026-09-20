@@ -4,11 +4,11 @@ class StartScreen extends StatefulWidget {
   final Future<void> Function({
     required String deviceId,
     required String testerId,
-  }) onStartStudy;
+  }) onContinueToConsent;
 
   const StartScreen({
     super.key,
-    required this.onStartStudy,
+    required this.onContinueToConsent,
   });
 
   @override
@@ -19,35 +19,43 @@ class _StartScreenState extends State<StartScreen> {
   String _selectedDeviceId = 'phone_1';
   String _selectedTesterId = 'michael';
 
-  bool _isStarting = false;
+  bool _isContinuing = false;
   String? _errorMessage;
 
-  Future<void> _startStudy() async {
-    if (_isStarting) {
+  Future<void> _continue() async {
+    if (_isContinuing) {
       return;
     }
 
     setState(() {
-      _isStarting = true;
+      _isContinuing = true;
       _errorMessage = null;
     });
 
     try {
-      await widget.onStartStudy(
+      await widget.onContinueToConsent(
         deviceId: _selectedDeviceId,
         testerId: _selectedTesterId,
       );
-    } catch (error) {
-      debugPrint('Fehler beim Studienstart: $error');
 
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _isStarting = false;
+        _isContinuing = false;
+      });
+    } catch (error) {
+      debugPrint('Fehler beim Öffnen der Einwilligung: $error');
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isContinuing = false;
         _errorMessage =
-            'Studie konnte nicht gestartet werden. Bitte erneut versuchen.';
+            'Die Einwilligung konnte nicht geöffnet werden. Bitte erneut versuchen.';
       });
     }
   }
@@ -57,12 +65,11 @@ class _StartScreenState extends State<StartScreen> {
     return Scaffold(
       body: SafeArea(
         child: Center(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 400),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Icon(Icons.photo_library_outlined, size: 64),
@@ -78,7 +85,15 @@ class _StartScreenState extends State<StartScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 10),
+
+                  const Text(
+                    'Versuchsleiter-Setup',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16),
+                  ),
+
+                  const SizedBox(height: 36),
 
                   const Text(
                     'Gerät',
@@ -91,7 +106,7 @@ class _StartScreenState extends State<StartScreen> {
                   const SizedBox(height: 8),
 
                   DropdownButtonFormField<String>(
-                    value: _selectedDeviceId,
+                    initialValue: _selectedDeviceId,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                     ),
@@ -105,7 +120,7 @@ class _StartScreenState extends State<StartScreen> {
                         child: Text('phone_2'),
                       ),
                     ],
-                    onChanged: _isStarting
+                    onChanged: _isContinuing
                         ? null
                         : (value) {
                             if (value == null) {
@@ -131,7 +146,7 @@ class _StartScreenState extends State<StartScreen> {
                   const SizedBox(height: 8),
 
                   DropdownButtonFormField<String>(
-                    value: _selectedTesterId,
+                    initialValue: _selectedTesterId,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                     ),
@@ -141,11 +156,11 @@ class _StartScreenState extends State<StartScreen> {
                         child: Text('Michael'),
                       ),
                       DropdownMenuItem(
-                        value: 'kollege',
-                        child: Text('Kollege'),
+                        value: 'ludwig',
+                        child: Text('Ludwig'),
                       ),
                     ],
-                    onChanged: _isStarting
+                    onChanged: _isContinuing
                         ? null
                         : (value) {
                             if (value == null) {
@@ -174,8 +189,8 @@ class _StartScreenState extends State<StartScreen> {
                   SizedBox(
                     height: 52,
                     child: ElevatedButton(
-                      onPressed: _isStarting ? null : _startStudy,
-                      child: _isStarting
+                      onPressed: _isContinuing ? null : _continue,
+                      child: _isContinuing
                           ? const SizedBox(
                               width: 24,
                               height: 24,
@@ -184,7 +199,7 @@ class _StartScreenState extends State<StartScreen> {
                               ),
                             )
                           : const Text(
-                              'Studie starten',
+                              'Weiter zur Einwilligung',
                               style: TextStyle(fontSize: 17),
                             ),
                     ),

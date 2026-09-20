@@ -58,6 +58,10 @@ class FirestoreService {
     required List<ConditionTiming> conditionTimings,
     required Map<String, dynamic> finalQuestionnaire,
     required Map<String, dynamic> demographics,
+    required bool consentAccepted,
+    required bool audioConsentAccepted,
+    required DateTime consentAcceptedAt,
+    required String consentVersion,
   }) async {
     final docRef = await _firestore.collection('study_runs').add({
       'participantId': participantId,
@@ -67,6 +71,15 @@ class FirestoreService {
       'counterbalanceGroup': counterbalanceGroup,
       'finalQuestionnaire': finalQuestionnaire,
       'demographics': demographics,
+
+      'consent': {
+        'accepted': consentAccepted,
+        'audioRecordingAccepted': audioConsentAccepted,
+        'acceptedAt': Timestamp.fromDate(consentAcceptedAt),
+        'version': consentVersion,
+        'method': 'in_app_checkbox',
+      },
+
       'createdAt': FieldValue.serverTimestamp(),
 
       'conditionOrder': conditionOrder.map((condition) {

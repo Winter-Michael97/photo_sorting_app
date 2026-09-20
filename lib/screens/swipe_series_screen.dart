@@ -80,11 +80,26 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
 
   void _handleDragEnd(DragEndDetails details) {
     final velocity = details.primaryVelocity ?? 0;
+    final dragX = _dragX;
 
-    final discard =
-        _dragX < -_swipeThreshold || velocity < -_velocityThreshold;
-    final keep =
-        _dragX > _swipeThreshold || velocity > _velocityThreshold;
+    // WICHTIG:
+    // Zuerst entscheidet die tatsächliche Wischrichtung über den Weg.
+    // Die Geschwindigkeit wird nur verwendet, wenn die Strecke noch nicht
+    // eindeutig genug war. Dadurch kann ein Rechts-Swipe nicht versehentlich
+    // als "Aussortieren" gewertet werden, nur weil die Endgeschwindigkeit
+    // kurz in die Gegenrichtung zeigt.
+    bool discard = false;
+    bool keep = false;
+
+    if (dragX <= -_swipeThreshold) {
+      discard = true;
+    } else if (dragX >= _swipeThreshold) {
+      keep = true;
+    } else if (velocity <= -_velocityThreshold) {
+      discard = true;
+    } else if (velocity >= _velocityThreshold) {
+      keep = true;
+    }
 
     setState(() {
       _dragX = 0;
@@ -143,6 +158,32 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
     if (_keptForNextRound.length == 1) {
       final selectedPhoto = _keptForNextRound.first;
       widget.onSeriesCompleted(widget.seriesId, selectedPhoto);
+      return;
+    }
+
+    // Wenn alle aktuell verbliebenen Fotos erneut behalten wurden, gab es
+    // in dieser Runde keine Eingrenzung. Dann bleiben wir bewusst bei
+    // derselben Serie und verlangen mindestens eine Aussortierung.
+    //
+    // Beispiel: Es sind noch 3 Fotos im Rennen und alle 3 werden wieder
+    // behalten -> NICHT zur nächsten Serie springen und auch keine neue
+    // "identische" Runde erzeugen.
+    if (_keptForNextRound.length == _roundPhotos.length) {
+      setState(() {
+        _keptForNextRound.clear();
+        _photoIndex = 0;
+        _dragX = 0;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Du hast alle verbliebenen Fotos behalten. '
+            'Bitte sortiere in dieser Runde mindestens ein Foto aus.',
+          ),
+          duration: Duration(milliseconds: 1800),
+        ),
+      );
       return;
     }
 

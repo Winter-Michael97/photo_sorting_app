@@ -34,3 +34,6 @@ flutter:
     - assets/test_images/clear_a2/
     - assets/test_images/series_b1/
     - assets/test_images/series_b2/
+    - assets/consent/consent_page_1.png
+    - assets/consent/consent_page_2.png
+    - assets/consent/study_consent.pdf

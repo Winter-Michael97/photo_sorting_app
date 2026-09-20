@@ -9,6 +9,7 @@ import 'models/study_session_info.dart';
 import 'models/condition_timing.dart';
 
 import 'screens/start_screen.dart';
+import 'screens/consent_screen.dart';
 import 'screens/condition_intro_screen.dart';
 import 'screens/swipe_independent_screen.dart';
 import 'screens/grid_independent_screen.dart';
@@ -24,6 +25,7 @@ import 'services/firestore_service.dart';
 
 enum AppStep {
   start,
+  consent,
   conditionIntro,
   swipeIndependent,
   gridIndependent,
@@ -61,6 +63,17 @@ class _StudyAppShellState extends State<StudyAppShell> {
   AppStep _currentStep = AppStep.start;
 
   StudySessionInfo? _sessionInfo;
+
+  // Startscreen-Daten werden zunächst nur zwischengespeichert.
+  // Die Teilnehmer-ID wird erst nach der Einwilligung erzeugt.
+  String? _pendingDeviceId;
+  String? _pendingTesterId;
+
+  bool _consentAccepted = false;
+  bool _audioConsentAccepted = false;
+  DateTime? _consentAcceptedAt;
+
+  static const String _consentVersion = '2026-09-20';
 
   int _currentConditionIndex = 0;
   int _currentSwipePhotoIndex = 0;
@@ -205,10 +218,49 @@ class _StudyAppShellState extends State<StudyAppShell> {
     return ((participantNumber - 1) % 4) + 1;
   }
 
-  Future<void> _startStudy({
+  Future<void> _openConsent({
     required String deviceId,
     required String testerId,
   }) async {
+    setState(() {
+      _pendingDeviceId = deviceId;
+      _pendingTesterId = testerId;
+
+      _sessionInfo = null;
+      _consentAccepted = false;
+      _audioConsentAccepted = false;
+      _consentAcceptedAt = null;
+
+      _currentStep = AppStep.consent;
+    });
+  }
+
+  void _backToStartFromConsent() {
+    setState(() {
+      _pendingDeviceId = null;
+      _pendingTesterId = null;
+      _sessionInfo = null;
+      _consentAccepted = false;
+      _audioConsentAccepted = false;
+      _consentAcceptedAt = null;
+      _currentStep = AppStep.start;
+    });
+  }
+
+  Future<void> _acceptConsentAndStart({
+    required bool audioConsentAccepted,
+  }) async {
+    final deviceId = _pendingDeviceId;
+    final testerId = _pendingTesterId;
+
+    if (deviceId == null || testerId == null) {
+      throw StateError(
+        'Gerät oder Versuchsleiter fehlen. Bitte zum Startscreen zurückkehren.',
+      );
+    }
+
+    // Automatische ID-Vergabe über Firestore:
+    // P001, P002, P003, ...
     final participantId = await _firestoreService.getNextParticipantId();
 
     final sessionInfo = StudySessionInfo(
@@ -219,11 +271,16 @@ class _StudyAppShellState extends State<StudyAppShell> {
 
     final group = _getCounterbalanceGroup(participantId);
     final conditionOrder = _buildCounterbalancedStudyConditions(group);
+    final acceptedAt = DateTime.now();
 
     setState(() {
       _sessionInfo = sessionInfo;
       _counterbalanceGroup = group;
       _conditionOrder = conditionOrder;
+
+      _consentAccepted = true;
+      _audioConsentAccepted = audioConsentAccepted;
+      _consentAcceptedAt = acceptedAt;
 
       _currentConditionIndex = 0;
       _currentSwipePhotoIndex = 0;
@@ -244,6 +301,8 @@ class _StudyAppShellState extends State<StudyAppShell> {
     debugPrint('Studie gestartet: $participantId');
     debugPrint('Gerät: $deviceId');
     debugPrint('Versuchsleiter: $testerId');
+    debugPrint('Einwilligung: $_consentAccepted');
+    debugPrint('Audio-Einwilligung: $_audioConsentAccepted');
     debugPrint('Counterbalance-Gruppe: $group');
     debugPrint(
       'Reihenfolge: ${conditionOrder.map((condition) => condition.id).join(' -> ')}',
@@ -514,6 +573,10 @@ class _StudyAppShellState extends State<StudyAppShell> {
         finalQuestionnaire:
             Map<String, dynamic>.from(_finalQuestionnaire),
         demographics: Map<String, dynamic>.from(_demographics),
+        consentAccepted: _consentAccepted,
+        audioConsentAccepted: _audioConsentAccepted,
+        consentAcceptedAt: _consentAcceptedAt ?? DateTime.now(),
+        consentVersion: _consentVersion,
       );
 
       debugPrint('Studienlauf gespeichert: $documentId');
@@ -551,7 +614,15 @@ class _StudyAppShellState extends State<StudyAppShell> {
   Widget build(BuildContext context) {
     switch (_currentStep) {
       case AppStep.start:
-        return StartScreen(onStartStudy: _startStudy);
+        return StartScreen(
+          onContinueToConsent: _openConsent,
+        );
+
+      case AppStep.consent:
+        return ConsentScreen(
+          onAccept: _acceptConsentAndStart,
+          onBack: _backToStartFromConsent,
+        );
 
       case AppStep.conditionIntro:
         return ConditionIntroScreen(
