@@ -59,7 +59,6 @@ class FirestoreService {
     required Map<String, dynamic> finalQuestionnaire,
     required Map<String, dynamic> demographics,
     required bool consentAccepted,
-    required bool audioConsentAccepted,
     required DateTime consentAcceptedAt,
     required String consentVersion,
   }) async {
@@ -74,7 +73,6 @@ class FirestoreService {
 
       'consent': {
         'accepted': consentAccepted,
-        'audioRecordingAccepted': audioConsentAccepted,
         'acceptedAt': Timestamp.fromDate(consentAcceptedAt),
         'version': consentVersion,
         'method': 'in_app_checkbox',

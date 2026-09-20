@@ -1,16 +1,11 @@
 import 'package:flutter/material.dart';
 
 class ConsentScreen extends StatefulWidget {
-  final Future<void> Function({
-    required bool audioConsentAccepted,
-  }) onAccept;
-
-  final VoidCallback onBack;
+  final Future<void> Function() onAccept;
 
   const ConsentScreen({
     super.key,
     required this.onAccept,
-    required this.onBack,
   });
 
   @override
@@ -19,7 +14,6 @@ class ConsentScreen extends StatefulWidget {
 
 class _ConsentScreenState extends State<ConsentScreen> {
   bool _studyConsentAccepted = false;
-  bool _audioConsentAccepted = false;
   bool _isSubmitting = false;
   String? _errorMessage;
 
@@ -34,9 +28,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
     });
 
     try {
-      await widget.onAccept(
-        audioConsentAccepted: _audioConsentAccepted,
-      );
+      await widget.onAccept();
     } catch (error) {
       debugPrint('Fehler beim Start nach Einwilligung: $error');
 
@@ -57,12 +49,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        leading: IconButton(
-          onPressed: _isSubmitting ? null : widget.onBack,
-          icon: const Icon(Icons.arrow_back),
-          tooltip: 'Zurück',
-        ),
-        title: const Text('Einwilligung'),
+        title: const Text('Einwilligung zur Studienteilnahme'),
       ),
       body: SafeArea(
         child: ListView(
@@ -73,68 +60,33 @@ class _ConsentScreenState extends State<ConsentScreen> {
               'Die Teilnahme ist freiwillig und kann jederzeit beendet werden.',
               style: TextStyle(fontSize: 16, height: 1.4),
             ),
-
             const SizedBox(height: 20),
-
             _buildDocumentPage('assets/consent/consent_page_1.png'),
-
             const SizedBox(height: 16),
-
             _buildDocumentPage('assets/consent/consent_page_2.png'),
-
             const SizedBox(height: 24),
-
             Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    CheckboxListTile(
-                      value: _studyConsentAccepted,
-                      controlAffinity: ListTileControlAffinity.leading,
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Ich habe die Informationen zur Studie gelesen und '
-                        'verstanden. Ich willige freiwillig in die Teilnahme '
-                        'und in die beschriebene Verarbeitung meiner '
-                        'Studiendaten ein.',
-                      ),
-                      onChanged: _isSubmitting
-                          ? null
-                          : (value) {
-                              setState(() {
-                                _studyConsentAccepted = value ?? false;
-                              });
-                            },
-                    ),
-
-                    const Divider(),
-
-                    CheckboxListTile(
-                      value: _audioConsentAccepted,
-                      controlAffinity: ListTileControlAffinity.leading,
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Ich bin zusätzlich mit der Audioaufnahme des kurzen '
-                        'Abschlussinterviews einverstanden.',
-                      ),
-                      subtitle: const Text(
-                        'Optional - die Teilnahme an der Studie ist auch ohne '
-                        'Audioaufnahme möglich.',
-                      ),
-                      onChanged: _isSubmitting
-                          ? null
-                          : (value) {
-                              setState(() {
-                                _audioConsentAccepted = value ?? false;
-                              });
-                            },
-                    ),
-                  ],
+              child: CheckboxListTile(
+                value: _studyConsentAccepted,
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
                 ),
+                title: const Text(
+                  'Ich habe die Informationen zur Studie gelesen und verstanden. '
+                  'Ich willige freiwillig in die Teilnahme und in die beschriebene '
+                  'Verarbeitung meiner Studiendaten ein.',
+                ),
+                onChanged: _isSubmitting
+                    ? null
+                    : (value) {
+                        setState(() {
+                          _studyConsentAccepted = value ?? false;
+                        });
+                      },
               ),
             ),
-
             if (_errorMessage != null) ...[
               const SizedBox(height: 16),
               Text(
