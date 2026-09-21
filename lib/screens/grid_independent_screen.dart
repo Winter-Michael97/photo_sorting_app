@@ -112,9 +112,9 @@ class _GridIndependentScreenState extends State<GridIndependentScreen> {
                   itemCount: widget.photos.length,
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.78,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 0.68,
                   ),
                   itemBuilder: (context, index) {
                     final photo = widget.photos[index];
