@@ -56,7 +56,7 @@ class ConditionCompleteScreen extends StatelessWidget {
                   const SizedBox(height: 12),
 
                   const Text(
-                    'Deine Antworten wurden gespeichert.',
+                    'Deine Antworten wurden übernommen.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 16,
