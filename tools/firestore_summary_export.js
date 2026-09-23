@@ -168,6 +168,7 @@ function summarizeCondition(run, conditionId) {
     confidence: ratings.confidence ?? '',
     workload: ratings.workload ?? '',
     satisfaction: ratings.satisfaction ?? '',
+    playfulness: ratings.playfulness ?? '',
     comparison: ratings.comparison ?? '',
   };
 }
@@ -227,6 +228,7 @@ async function main() {
       SA_confidence: SA.confidence,
       SA_workload: SA.workload,
       SA_satisfaction: SA.satisfaction,
+      SA_playfulness: SA.playfulness,
 
       RA_photoSet: RA.photoSet,
       RA_position: RA.position,
@@ -239,6 +241,7 @@ async function main() {
       RA_confidence: RA.confidence,
       RA_workload: RA.workload,
       RA_satisfaction: RA.satisfaction,
+      RA_playfulness: RA.playfulness,
 
       SB_photoSet: SB.photoSet,
       SB_position: SB.position,
@@ -251,6 +254,7 @@ async function main() {
       SB_confidence: SB.confidence,
       SB_workload: SB.workload,
       SB_satisfaction: SB.satisfaction,
+      SB_playfulness: SB.playfulness,
       SB_comparison: SB.comparison,
 
       RB_photoSet: RB.photoSet,
@@ -264,6 +268,7 @@ async function main() {
       RB_confidence: RB.confidence,
       RB_workload: RB.workload,
       RB_satisfaction: RB.satisfaction,
+      RB_playfulness: RB.playfulness,
       RB_comparison: RB.comparison,
 
       overallPreference: finalQ.overallPreference || '',
