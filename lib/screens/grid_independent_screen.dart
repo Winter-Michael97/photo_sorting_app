@@ -27,46 +27,36 @@ class GridIndependentScreen extends StatefulWidget {
 }
 
 class _GridIndependentScreenState extends State<GridIndependentScreen> {
-  late Map<String, SortingAction?> _decisions;
+  final Set<String> _selectedForDeletion = <String>{};
 
-  @override
-  void initState() {
-    super.initState();
+  int get _selectedCount => _selectedForDeletion.length;
 
-    _decisions = {
-      for (final photo in widget.photos) photo.id: null,
-    };
-  }
-
-  void _setDecision(String photoId, SortingAction newDecision) {
-    final previousDecision = _decisions[photoId];
-
-    if (previousDecision == newDecision) {
-      return;
-    }
+  void _togglePhoto(PhotoItem photo) {
+    final wasSelected = _selectedForDeletion.contains(photo.id);
 
     setState(() {
-      _decisions[photoId] = newDecision;
+      if (wasSelected) {
+        _selectedForDeletion.remove(photo.id);
+      } else {
+        _selectedForDeletion.add(photo.id);
+      }
     });
 
-    widget.onDecisionChanged(photoId, previousDecision, newDecision);
-  }
-
-  int get _decidedCount {
-    return _decisions.values.where((decision) => decision != null).length;
-  }
-
-  bool get _allPhotosDecided {
-    return _decidedCount == widget.photos.length;
+    // Für die bestehende App-Schnittstelle:
+    // markiert = aussortieren, unmarkiert = behalten.
+    widget.onDecisionChanged(
+      photo.id,
+      wasSelected ? SortingAction.discard : SortingAction.keep,
+      wasSelected ? SortingAction.keep : SortingAction.discard,
+    );
   }
 
   void _confirmSelection() {
-    if (!_allPhotosDecided) {
-      return;
-    }
-
-    final completedDecisions = {
-      for (final entry in _decisions.entries) entry.key: entry.value!,
+    final completedDecisions = <String, SortingAction>{
+      for (final photo in widget.photos)
+        photo.id: _selectedForDeletion.contains(photo.id)
+            ? SortingAction.discard
+            : SortingAction.keep,
     };
 
     widget.onConfirm(Map.unmodifiable(completedDecisions));
@@ -77,18 +67,21 @@ class _GridIndependentScreenState extends State<GridIndependentScreen> {
     return Scaffold(
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
           child: Column(
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'Fotos bewerten',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    'Fotos auswählen',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   Text(
-                    '$_decidedCount / ${widget.photos.length}',
+                    '$_selectedCount ausgewählt',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -99,43 +92,52 @@ class _GridIndependentScreenState extends State<GridIndependentScreen> {
 
               const SizedBox(height: 8),
 
-              LinearProgressIndicator(
-                value: widget.photos.isEmpty
-                    ? 0
-                    : _decidedCount / widget.photos.length,
+              const Text(
+                'Tippe auf die Fotos, die du aussortieren möchtest. '
+                'Nicht markierte Fotos werden behalten.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
               Expanded(
                 child: GridView.builder(
                   itemCount: widget.photos.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                    childAspectRatio: 0.68,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                    childAspectRatio: 0.90,
                   ),
                   itemBuilder: (context, index) {
                     final photo = widget.photos[index];
-                    final decision = _decisions[photo.id];
+                    final isSelected =
+                        _selectedForDeletion.contains(photo.id);
 
-                    return _buildPhotoCard(photo, decision);
+                    return _buildPhotoTile(photo, isSelected);
                   },
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               SizedBox(
                 width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: _allPhotosDecided ? _confirmSelection : null,
-                  child: Text(
-                    _allPhotosDecided
-                        ? 'Auswahl bestätigen'
-                        : 'Alle Fotos bewerten',
+                height: 54,
+                child: FilledButton.icon(
+                  onPressed: _confirmSelection,
+                  icon: Icon(
+                    _selectedCount == 0
+                        ? Icons.check
+                        : Icons.delete_outline,
+                  ),
+                  label: Text(
+                    _selectedCount == 0
+                        ? 'Ohne Löschen fortfahren'
+                        : '$_selectedCount ausgewählte '
+                            '${_selectedCount == 1 ? 'Foto' : 'Fotos'} löschen',
                   ),
                 ),
               ),
@@ -146,72 +148,90 @@ class _GridIndependentScreenState extends State<GridIndependentScreen> {
     );
   }
 
-  Widget _buildPhotoCard(PhotoItem photo, SortingAction? decision) {
-    return Card(
+  Widget _buildPhotoTile(PhotoItem photo, bool isSelected) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Material(
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          Expanded(
-            child: SizedBox(
-              width: double.infinity,
-              child: Image.asset(photo.assetPath, fit: BoxFit.cover),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: () => _togglePhoto(photo),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              photo.assetPath,
+              fit: BoxFit.cover,
             ),
-          ),
 
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: _buildDecisionLabel(decision),
-          ),
+            if (isSelected)
+              Container(
+                color: Colors.black.withValues(alpha: 0.30),
+              ),
 
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: IconButton.filledTonal(
-                    onPressed: () {
-                      _setDecision(photo.id, SortingAction.discard);
-                    },
-                    icon: const Icon(Icons.close),
-                    tooltip: 'Aussortieren',
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isSelected
+                      ? colorScheme.error
+                      : Colors.black.withValues(alpha: 0.42),
+                  border: Border.all(
+                    color: Colors.white,
+                    width: 2,
                   ),
                 ),
+                child: Icon(
+                  isSelected ? Icons.check : Icons.circle_outlined,
+                  size: 19,
+                  color: Colors.white,
+                ),
+              ),
+            ),
 
-                const SizedBox(width: 8),
-
-                Expanded(
-                  child: IconButton.filledTonal(
-                    onPressed: () {
-                      _setDecision(photo.id, SortingAction.keep);
-                    },
-                    icon: const Icon(Icons.check),
-                    tooltip: 'Behalten',
+            if (isSelected)
+              const Positioned(
+                left: 8,
+                bottom: 8,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Color(0x99000000),
+                    borderRadius: BorderRadius.all(Radius.circular(6)),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 5,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.delete_outline,
+                          color: Colors.white,
+                          size: 17,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'Löschen',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ],
-            ),
-          ),
-        ],
+              ),
+          ],
+        ),
       ),
     );
-  }
-
-  Widget _buildDecisionLabel(SortingAction? decision) {
-    switch (decision) {
-      case SortingAction.keep:
-        return const Text(
-          'Behalten',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        );
-
-      case SortingAction.discard:
-        return const Text(
-          'Aussortieren',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        );
-
-      case null:
-        return const Text('Nicht bewertet');
-    }
   }
 }

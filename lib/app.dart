@@ -120,6 +120,10 @@ class _StudyAppShellState extends State<StudyAppShell> {
         id: 'satisfaction',
         text: 'Die Bedienung war angenehm.',
       ),
+      const RatingQuestion(
+        id: 'playfulness',
+        text: 'Die Bedienung fühlte sich spielerisch an.',
+      ),
       if (_currentCondition.taskType == TaskType.series)
         const RatingQuestion(
           id: 'comparison',

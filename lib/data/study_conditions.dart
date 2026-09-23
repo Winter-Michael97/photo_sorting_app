@@ -139,12 +139,12 @@ final List<StudyCondition> studyConditions = [
     taskType: TaskType.independent,
     title: 'Raster: Einzelfotos',
     description:
-        'In dieser Aufgabe bewertest du mehrere Fotos in einer Rasteransicht. Entscheide für jedes Foto, ob es behalten oder aussortiert werden soll.',
+        'In dieser Aufgabe siehst du 20 Fotos in einer Rasteransicht. Wähle die Fotos aus, die du aussortieren möchtest.',
     instructions: [
-      'Bewerte jedes Foto im Raster.',
-      'Markiere pro Foto, ob es behalten oder aussortiert werden soll.',
-      'Du kannst erst fortfahren, wenn alle Fotos bewertet wurden.',
-      'Arbeite möglichst zügig, aber trotzdem sorgfältig.',
+      'Tippe auf die Fotos, die du löschen möchtest.',
+      'Markierte Fotos werden aussortiert; nicht markierte Fotos werden behalten.',
+      'Du kannst deine Auswahl vor dem Bestätigen jederzeit ändern.',
+      'Bestätige unten das Löschen der ausgewählten Fotos.',
     ],
     photos: clearA2Photos,
   ),
