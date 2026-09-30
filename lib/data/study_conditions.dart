@@ -124,8 +124,10 @@ final List<StudyCondition> studyConditions = [
     taskType: TaskType.independent,
     title: 'Swipe: Einzelfotos',
     description:
-        'In dieser Aufgabe bewertest du Fotos nacheinander. Entscheide für jedes Foto, ob es behalten oder aussortiert werden soll.',
+        'In dieser Aufgabe bewertest du Fotos nacheinander. Entscheide für jedes Foto, ob es aufgrund seiner sichtbaren Bildqualität behalten oder aussortiert werden sollte.',
     instructions: [
+      'Bewerte die Fotos möglichst anhand ihrer sichtbaren Bildqualität und nicht danach, welches Motiv dir persönlich besser gefällt.',
+      'Achte zum Beispiel auf Schärfe, Belichtung und erkennbare Bildfehler.',
       'Swipe nach links = Foto aussortieren.',
       'Swipe nach rechts = Foto behalten.',
       'Arbeite möglichst zügig, aber trotzdem sorgfältig.',
@@ -133,45 +135,55 @@ final List<StudyCondition> studyConditions = [
     ],
     photos: clearA1Photos,
   ),
+
   StudyCondition(
     id: 'RA',
     interfaceType: InterfaceType.grid,
     taskType: TaskType.independent,
     title: 'Raster: Einzelfotos',
     description:
-        'In dieser Aufgabe siehst du 20 Fotos in einer Rasteransicht. Wähle die Fotos aus, die du aussortieren möchtest.',
+        'In dieser Aufgabe bewertest du mehrere Fotos gleichzeitig in einer Rasteransicht. Wähle die Fotos aus, die aufgrund ihrer sichtbaren Bildqualität aussortiert werden sollten.',
     instructions: [
-      'Tippe auf die Fotos, die du löschen möchtest.',
-      'Markierte Fotos werden aussortiert; nicht markierte Fotos werden behalten.',
-      'Du kannst deine Auswahl vor dem Bestätigen jederzeit ändern.',
-      'Bestätige unten das Löschen der ausgewählten Fotos.',
+      'Bewerte die Fotos möglichst anhand ihrer sichtbaren Bildqualität und nicht danach, welches Motiv dir persönlich besser gefällt.',
+      'Achte zum Beispiel auf Schärfe, Belichtung und erkennbare Bildfehler.',
+      'Tippe auf ein Foto, um es zum Aussortieren auszuwählen.',
+      'Tippe erneut auf ein ausgewähltes Foto, um die Auswahl zurückzunehmen.',
+      'Nicht ausgewählte Fotos werden behalten.',
+      'Bestätige unten deine Auswahl, wenn du fertig bist.',
+      'Arbeite möglichst zügig, aber trotzdem sorgfältig.',
     ],
     photos: clearA2Photos,
   ),
+
   StudyCondition(
     id: 'SB',
     interfaceType: InterfaceType.swipe,
     taskType: TaskType.series,
     title: 'Swipe: Fotoserie',
     description:
-        'In dieser Aufgabe vergleichst du mehrere ähnliche Fotos nacheinander. Ziel ist es, aus jeder Serie genau ein bestes Foto auszuwählen.',
+        'In dieser Aufgabe vergleichst du mehrere ähnliche Fotos derselben Serie. Ziel ist es, anhand der sichtbaren Bildqualität genau ein bestes Foto auszuwählen.',
     instructions: [
-      'Das erste Foto ist automatisch der aktuelle Favorit.',
-      'Swipe nach links = aktuelles Vergleichsfoto aussortieren.',
-      'Swipe nach rechts = aktuelles Vergleichsfoto wird neuer Favorit.',
-      'Am Ende bleibt pro Serie genau ein Favorit übrig.',
+      'Wähle das qualitativ beste Foto und nicht das Foto, dessen Motiv dir persönlich am besten gefällt.',
+      'Achte zum Beispiel auf Schärfe, Belichtung und erkennbare Bildfehler.',
+      'Swipe nach links = Foto aussortieren.',
+      'Swipe nach rechts = Foto für die nächste Vergleichsrunde behalten.',
+      'Bleiben mehrere Fotos übrig, vergleichst du diese erneut.',
+      'Am Ende bleibt genau ein bestes Foto pro Serie übrig.',
     ],
     photos: seriesB1Photos,
   ),
+
   StudyCondition(
     id: 'RB',
     interfaceType: InterfaceType.grid,
     taskType: TaskType.series,
     title: 'Raster: Fotoserie',
     description:
-        'In dieser Aufgabe siehst du mehrere ähnliche Fotos gleichzeitig. Ziel ist es, aus jeder Serie genau ein bestes Foto auszuwählen.',
+        'In dieser Aufgabe siehst du mehrere ähnliche Fotos derselben Serie gleichzeitig. Ziel ist es, anhand der sichtbaren Bildqualität genau ein bestes Foto auszuwählen.',
     instructions: [
-      'Tippe auf das Foto, das du für das beste Foto der Serie hältst.',
+      'Wähle das qualitativ beste Foto und nicht das Foto, dessen Motiv dir persönlich am besten gefällt.',
+      'Achte zum Beispiel auf Schärfe, Belichtung und erkennbare Bildfehler.',
+      'Tippe auf das Foto, das du für das qualitativ beste Foto der Serie hältst.',
       'Es kann immer nur ein Foto ausgewählt sein.',
       'Du kannst deine Auswahl ändern, bevor du bestätigst.',
       'Bestätige deine Auswahl, um zur nächsten Serie zu gelangen.',
