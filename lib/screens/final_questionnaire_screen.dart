@@ -14,13 +14,13 @@ class FinalQuestionnaireScreen extends StatefulWidget {
 }
 
 class _FinalQuestionnaireScreenState extends State<FinalQuestionnaireScreen> {
-  String? _overallPreference;
-  String? _independentPreference;
-  String? _seriesPreference;
-  String? _perceivedSpeed;
-  String? _perceivedControl;
-  String? _perceivedEase;
-  String? _ownPhotoPreference;
+  double? _overallPreference;
+  double? _independentPreference;
+  double? _seriesPreference;
+  double? _perceivedSpeed;
+  double? _perceivedControl;
+  double? _perceivedEase;
+  double? _ownPhotoPreference;
 
   final TextEditingController _commentController = TextEditingController();
 
@@ -45,15 +45,51 @@ class _FinalQuestionnaireScreenState extends State<FinalQuestionnaireScreen> {
     }
 
     widget.onSubmit({
-      'overallPreference': _overallPreference,
-      'independentPreference': _independentPreference,
-      'seriesPreference': _seriesPreference,
-      'perceivedSpeed': _perceivedSpeed,
-      'perceivedControl': _perceivedControl,
-      'perceivedEase': _perceivedEase,
-      'ownPhotoPreference': _ownPhotoPreference,
+      // Einheitliche bipolare Skala:
+      // -3 = starke Tendenz zu Swipe
+      //  0 = keine Präferenz / kein Unterschied
+      // +3 = starke Tendenz zu Raster
+      'scaleMin': -3,
+      'scaleMax': 3,
+      'scaleLeft': 'Swipe',
+      'scaleCenter': 'Keine Präferenz / kein Unterschied',
+      'scaleRight': 'Raster',
+
+      'overallPreference': _overallPreference!.round(),
+      'independentPreference': _independentPreference!.round(),
+      'seriesPreference': _seriesPreference!.round(),
+      'perceivedSpeed': _perceivedSpeed!.round(),
+      'perceivedControl': _perceivedControl!.round(),
+      'perceivedEase': _perceivedEase!.round(),
+      'ownPhotoPreference': _ownPhotoPreference!.round(),
+
       'comment': _commentController.text.trim(),
     });
+  }
+
+  String _valueLabel(double? value, String centerLabel) {
+    if (value == null) {
+      return 'Noch nicht beantwortet';
+    }
+
+    switch (value.round()) {
+      case -3:
+        return 'Stark Swipe';
+      case -2:
+        return 'Swipe';
+      case -1:
+        return 'Eher Swipe';
+      case 0:
+        return centerLabel;
+      case 1:
+        return 'Eher Raster';
+      case 2:
+        return 'Raster';
+      case 3:
+        return 'Stark Raster';
+      default:
+        return '';
+    }
   }
 
   @override
@@ -74,104 +110,76 @@ class _FinalQuestionnaireScreenState extends State<FinalQuestionnaireScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Bitte wähle jeweils die Antwort aus, die deinem persönlichen '
-              'Eindruck am ehesten entspricht.',
-              style: TextStyle(fontSize: 14),
+              'Verschiebe den Regler für jede Frage in Richtung Swipe oder Raster. '
+              'Die Mitte bedeutet keine Präferenz beziehungsweise keinen Unterschied.',
+              style: TextStyle(fontSize: 14, height: 1.4),
             ),
             const SizedBox(height: 24),
 
-            _buildQuestion(
+            _buildScaleQuestion(
               number: 1,
               question: 'Welche Bedienform hast du insgesamt bevorzugt?',
               value: _overallPreference,
-              options: const [
-                _AnswerOption('swipe', 'Swipe'),
-                _AnswerOption('grid', 'Raster'),
-                _AnswerOption('no_preference', 'Keine Präferenz'),
-              ],
+              centerLabel: 'Keine Präferenz',
               onChanged: (value) =>
                   setState(() => _overallPreference = value),
             ),
 
-            _buildQuestion(
+            _buildScaleQuestion(
               number: 2,
               question:
                   'Welche Bedienform würdest du für das Aussortieren einzelner Fotos bevorzugen?',
               value: _independentPreference,
-              options: const [
-                _AnswerOption('swipe', 'Swipe'),
-                _AnswerOption('grid', 'Raster'),
-                _AnswerOption('no_preference', 'Keine Präferenz'),
-              ],
+              centerLabel: 'Keine Präferenz',
               onChanged: (value) =>
                   setState(() => _independentPreference = value),
             ),
 
-            _buildQuestion(
+            _buildScaleQuestion(
               number: 3,
               question:
                   'Welche Bedienform würdest du für die Auswahl aus Fotoserien bevorzugen?',
               value: _seriesPreference,
-              options: const [
-                _AnswerOption('swipe', 'Swipe'),
-                _AnswerOption('grid', 'Raster'),
-                _AnswerOption('no_preference', 'Keine Präferenz'),
-              ],
+              centerLabel: 'Keine Präferenz',
               onChanged: (value) =>
                   setState(() => _seriesPreference = value),
             ),
 
-            _buildQuestion(
+            _buildScaleQuestion(
               number: 4,
               question: 'Welche Bedienform fühlte sich für dich schneller an?',
               value: _perceivedSpeed,
-              options: const [
-                _AnswerOption('swipe', 'Swipe'),
-                _AnswerOption('grid', 'Raster'),
-                _AnswerOption('no_difference', 'Kein Unterschied'),
-              ],
+              centerLabel: 'Kein Unterschied',
               onChanged: (value) =>
                   setState(() => _perceivedSpeed = value),
             ),
 
-            _buildQuestion(
+            _buildScaleQuestion(
               number: 5,
               question:
                   'Bei welcher Bedienform hattest du mehr Kontrolle über deine Entscheidungen?',
               value: _perceivedControl,
-              options: const [
-                _AnswerOption('swipe', 'Swipe'),
-                _AnswerOption('grid', 'Raster'),
-                _AnswerOption('no_difference', 'Kein Unterschied'),
-              ],
+              centerLabel: 'Kein Unterschied',
               onChanged: (value) =>
                   setState(() => _perceivedControl = value),
             ),
 
-            _buildQuestion(
+            _buildScaleQuestion(
               number: 6,
               question:
                   'Welche Bedienform fandest du insgesamt einfacher zu bedienen?',
               value: _perceivedEase,
-              options: const [
-                _AnswerOption('swipe', 'Swipe'),
-                _AnswerOption('grid', 'Raster'),
-                _AnswerOption('no_difference', 'Kein Unterschied'),
-              ],
+              centerLabel: 'Kein Unterschied',
               onChanged: (value) =>
                   setState(() => _perceivedEase = value),
             ),
 
-            _buildQuestion(
+            _buildScaleQuestion(
               number: 7,
               question:
                   'Welche Bedienform würdest du eher zur Verwaltung deiner eigenen Fotos verwenden?',
               value: _ownPhotoPreference,
-              options: const [
-                _AnswerOption('swipe', 'Swipe'),
-                _AnswerOption('grid', 'Raster'),
-                _AnswerOption('no_preference', 'Keine Präferenz'),
-              ],
+              centerLabel: 'Keine Präferenz',
               onChanged: (value) =>
                   setState(() => _ownPhotoPreference = value),
             ),
@@ -179,7 +187,10 @@ class _FinalQuestionnaireScreenState extends State<FinalQuestionnaireScreen> {
             const SizedBox(height: 8),
             const Text(
               'Optionaler Kommentar',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(height: 8),
             TextField(
@@ -217,40 +228,92 @@ class _FinalQuestionnaireScreenState extends State<FinalQuestionnaireScreen> {
     );
   }
 
-  Widget _buildQuestion({
+  Widget _buildScaleQuestion({
     required int number,
     required String question,
-    required String? value,
-    required List<_AnswerOption> options,
-    required ValueChanged<String?> onChanged,
+    required double? value,
+    required String centerLabel,
+    required ValueChanged<double> onChanged,
   }) {
+    final sliderValue = value ?? 0.0;
+    final answerLabel = _valueLabel(value, centerLabel);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
       child: Card(
         margin: EdgeInsets.zero,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 16, 12, 10),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Text(
-                  '$number. $question',
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                  ),
+              Text(
+                '$number. $question',
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
                 ),
               ),
+              const SizedBox(height: 16),
+
+              Row(
+                children: const [
+                  Expanded(
+                    child: Text(
+                      'Swipe',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    'gleich',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'Raster',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              Slider(
+                value: sliderValue,
+                min: -3,
+                max: 3,
+                divisions: 6,
+                label: value == null ? null : answerLabel,
+                onChanged: onChanged,
+              ),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: const [
+                  Text('-3', style: TextStyle(fontSize: 12)),
+                  Text('0', style: TextStyle(fontSize: 12)),
+                  Text('+3', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+
               const SizedBox(height: 8),
-              ...options.map(
-                (option) => RadioListTile<String>(
-                  contentPadding: EdgeInsets.zero,
-                  value: option.value,
-                  groupValue: value,
-                  title: Text(option.label),
-                  onChanged: onChanged,
+
+              Text(
+                answerLabel,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: value == null
+                      ? Theme.of(context).colorScheme.onSurfaceVariant
+                      : Theme.of(context).colorScheme.primary,
                 ),
               ),
             ],
@@ -259,11 +322,4 @@ class _FinalQuestionnaireScreenState extends State<FinalQuestionnaireScreen> {
       ),
     );
   }
-}
-
-class _AnswerOption {
-  final String value;
-  final String label;
-
-  const _AnswerOption(this.value, this.label);
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/interaction_event.dart';
 import '../models/photo_item.dart';
 
 class SwipeIndependentScreen extends StatefulWidget {
@@ -10,6 +11,7 @@ class SwipeIndependentScreen extends StatefulWidget {
 
   final ValueChanged<PhotoItem> onKeep;
   final ValueChanged<PhotoItem> onDiscard;
+  final ValueChanged<InteractionEventDraft> onInteractionEvent;
 
   const SwipeIndependentScreen({
     super.key,
@@ -18,6 +20,7 @@ class SwipeIndependentScreen extends StatefulWidget {
     required this.totalCount,
     required this.onKeep,
     required this.onDiscard,
+    required this.onInteractionEvent,
   });
 
   @override
@@ -26,9 +29,33 @@ class SwipeIndependentScreen extends StatefulWidget {
 
 class _SwipeIndependentScreenState extends State<SwipeIndependentScreen> {
   double _dragX = 0;
+  late final DateTime _shownAt;
+  bool _decisionLogged = false;
 
   static const double _swipeThreshold = 90;
   static const double _velocityThreshold = 800;
+
+  @override
+  void initState() {
+    super.initState();
+    _shownAt = DateTime.now();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      widget.onInteractionEvent(
+        InteractionEventDraft(
+          eventType: 'photo_shown',
+          timestamp: _shownAt,
+          photoId: widget.photo.id,
+          presentationIndex: widget.currentIndex,
+          expectedAction: widget.photo.expectedAction?.name,
+        ),
+      );
+    });
+  }
 
   void _handleDragUpdate(DragUpdateDetails details) {
     setState(() {
@@ -37,6 +64,10 @@ class _SwipeIndependentScreenState extends State<SwipeIndependentScreen> {
   }
 
   void _handleDragEnd(DragEndDetails details) {
+    if (_decisionLogged) {
+      return;
+    }
+
     final velocity = details.primaryVelocity ?? 0;
 
     final discard = _dragX < -_swipeThreshold || velocity < -_velocityThreshold;
@@ -47,10 +78,33 @@ class _SwipeIndependentScreenState extends State<SwipeIndependentScreen> {
     });
 
     if (discard) {
+      _logActionAndContinue('discard');
       widget.onDiscard(widget.photo);
     } else if (keep) {
+      _logActionAndContinue('keep');
       widget.onKeep(widget.photo);
     }
+  }
+
+  void _logActionAndContinue(String action) {
+    if (_decisionLogged) {
+      return;
+    }
+
+    _decisionLogged = true;
+    final actionAt = DateTime.now();
+
+    widget.onInteractionEvent(
+      InteractionEventDraft(
+        eventType: 'photo_action',
+        timestamp: actionAt,
+        photoId: widget.photo.id,
+        presentationIndex: widget.currentIndex,
+        action: action,
+        durationMs: actionAt.difference(_shownAt).inMilliseconds,
+        expectedAction: widget.photo.expectedAction?.name,
+      ),
+    );
   }
 
   @override

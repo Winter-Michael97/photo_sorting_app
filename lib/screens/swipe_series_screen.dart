@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/interaction_event.dart';
 import '../models/photo_item.dart';
 
 class SwipeSeriesScreen extends StatefulWidget {
@@ -11,6 +12,7 @@ class SwipeSeriesScreen extends StatefulWidget {
 
   final void Function(String seriesId, PhotoItem selectedPhoto)
       onSeriesCompleted;
+  final ValueChanged<InteractionEventDraft> onInteractionEvent;
 
   const SwipeSeriesScreen({
     super.key,
@@ -19,6 +21,7 @@ class SwipeSeriesScreen extends StatefulWidget {
     required this.currentSeriesIndex,
     required this.totalSeriesCount,
     required this.onSeriesCompleted,
+    required this.onInteractionEvent,
   });
 
   @override
@@ -31,8 +34,10 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
 
   int _photoIndex = 0;
   int _roundNumber = 1;
+  int _presentationCounter = 0;
 
   double _dragX = 0;
+  DateTime? _currentShownAt;
 
   static const double _swipeThreshold = 90;
   static const double _velocityThreshold = 800;
@@ -46,6 +51,7 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
     }
 
     _roundPhotos = List<PhotoItem>.from(widget.photos);
+    _markCurrentPhotoShown();
 
     // Falls eine Serie ausnahmsweise nur ein Foto enthält, ist die Auswahl
     // bereits eindeutig.
@@ -72,6 +78,63 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
     return (_photoIndex + 1) / _roundPhotos.length;
   }
 
+  void _markCurrentPhotoShown() {
+    if (_roundPhotos.isEmpty) {
+      return;
+    }
+
+    final photo = _currentPhoto;
+    final shownAt = DateTime.now();
+    final roundNumber = _roundNumber;
+    final positionInRound = _photoIndex + 1;
+
+    _currentShownAt = shownAt;
+    _presentationCounter++;
+    final presentationIndex = _presentationCounter;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      widget.onInteractionEvent(
+        InteractionEventDraft(
+          eventType: 'photo_shown',
+          timestamp: shownAt,
+          photoId: photo.id,
+          seriesId: widget.seriesId,
+          presentationIndex: presentationIndex,
+          seriesIndex: widget.currentSeriesIndex,
+          roundNumber: roundNumber,
+          positionInRound: positionInRound,
+          isBestInSeries: photo.isBestInSeries,
+        ),
+      );
+    });
+  }
+
+  void _logCurrentAction(String action) {
+    final photo = _currentPhoto;
+    final actionAt = DateTime.now();
+    final shownAt = _currentShownAt ?? actionAt;
+
+    widget.onInteractionEvent(
+      InteractionEventDraft(
+        eventType: 'photo_action',
+        timestamp: actionAt,
+        photoId: photo.id,
+        seriesId: widget.seriesId,
+        presentationIndex: _presentationCounter,
+        seriesIndex: widget.currentSeriesIndex,
+        roundNumber: _roundNumber,
+        positionInRound: _photoIndex + 1,
+        action: action,
+        durationMs: actionAt.difference(shownAt).inMilliseconds,
+        isBestInSeries: photo.isBestInSeries,
+      ),
+    );
+  }
+
   void _handleDragUpdate(DragUpdateDetails details) {
     setState(() {
       _dragX += details.delta.dx;
@@ -82,12 +145,8 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
     final velocity = details.primaryVelocity ?? 0;
     final dragX = _dragX;
 
-    // WICHTIG:
-    // Zuerst entscheidet die tatsächliche Wischrichtung über den Weg.
-    // Die Geschwindigkeit wird nur verwendet, wenn die Strecke noch nicht
-    // eindeutig genug war. Dadurch kann ein Rechts-Swipe nicht versehentlich
-    // als "Aussortieren" gewertet werden, nur weil die Endgeschwindigkeit
-    // kurz in die Gegenrichtung zeigt.
+    // Zuerst entscheidet die Wischstrecke. Die Geschwindigkeit wird nur
+    // verwendet, wenn die Strecke noch nicht eindeutig genug war.
     bool discard = false;
     bool keep = false;
 
@@ -114,8 +173,6 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
 
   void _discardCurrentPhoto() {
     // Das letzte noch mögliche Foto darf nicht ebenfalls aussortiert werden.
-    // Beispiel: In dieser Runde wurde bisher kein Foto behalten und nur das
-    // aktuelle Foto ist noch übrig.
     if (_keptForNextRound.isEmpty && _remainingInRound == 1) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -128,10 +185,12 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
       return;
     }
 
+    _logCurrentAction('discard');
     _advanceAfterDecision();
   }
 
   void _keepCurrentPhoto() {
+    _logCurrentAction('keep');
     _keptForNextRound.add(_currentPhoto);
     _advanceAfterDecision();
   }
@@ -143,6 +202,7 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
       setState(() {
         _photoIndex++;
       });
+      _markCurrentPhotoShown();
       return;
     }
 
@@ -151,7 +211,6 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
 
   void _finishRound() {
     if (_keptForNextRound.isEmpty) {
-      // Sollte durch die Sperre in _discardCurrentPhoto nicht vorkommen.
       return;
     }
 
@@ -161,19 +220,15 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
       return;
     }
 
-    // Wenn alle aktuell verbliebenen Fotos erneut behalten wurden, gab es
-    // in dieser Runde keine Eingrenzung. Dann bleiben wir bewusst bei
-    // derselben Serie und verlangen mindestens eine Aussortierung.
-    //
-    // Beispiel: Es sind noch 3 Fotos im Rennen und alle 3 werden wieder
-    // behalten -> NICHT zur nächsten Serie springen und auch keine neue
-    // "identische" Runde erzeugen.
+    // Keine Eingrenzung: dieselben Fotos werden nochmals gezeigt.
     if (_keptForNextRound.length == _roundPhotos.length) {
       setState(() {
         _keptForNextRound.clear();
         _photoIndex = 0;
         _dragX = 0;
       });
+
+      _markCurrentPhotoShown();
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -196,6 +251,8 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
       _roundNumber++;
       _dragX = 0;
     });
+
+    _markCurrentPhotoShown();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -240,7 +297,6 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              // ---------- Serie / Runde ----------
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -279,9 +335,7 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
               ),
 
               const SizedBox(height: 10),
-
               LinearProgressIndicator(value: _progress),
-
               const SizedBox(height: 14),
 
               Text(
@@ -299,7 +353,6 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
 
               const SizedBox(height: 18),
 
-              // ---------- Aktuelles Foto ----------
               Expanded(
                 child: Center(
                   child: GestureDetector(
@@ -342,7 +395,6 @@ class _SwipeSeriesScreenState extends State<SwipeSeriesScreen> {
 
               const SizedBox(height: 18),
 
-              // ---------- Swipe Erklärung ----------
               Row(
                 children: [
                   Expanded(

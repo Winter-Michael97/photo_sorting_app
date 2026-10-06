@@ -3,10 +3,18 @@
  *
  * Ausgabe:
  *   firestore_summary/results_summary.csv
+ *   firestore_summary/interaction_events.csv
  *
- * Eine Zeile = eine Versuchsperson.
- * Enthält die zusammengefassten Ergebnisse für SA, RA, SB und RB:
- * Foto-Set, Reihenfolge, Dauer, Trefferquote und Ratings.
+ * results_summary.csv:
+ *   Eine Zeile = eine Versuchsperson.
+ *   Enthält die zusammengefassten Ergebnisse für SA, RA, SB und RB:
+ *   Foto-Set, Reihenfolge, Dauer, Trefferquote, Ratings,
+ *   Gerät, Demografie und Abschlussfragebogen.
+ *
+ * interaction_events.csv:
+ *   Eine Zeile = ein geloggtes Präsentations-/Interaktionsereignis.
+ *   Enthält u. a. Foto-ID, Serie, Schwierigkeit, Zeitstempel,
+ *   Position, Swipe-/Raster-Aktion und gemessene Dauer.
  *
  * WICHTIG:
  * Die Ground Truth wird NICHT nochmal hart im Script definiert.
@@ -50,7 +58,8 @@ if (serviceAccountPath) {
 const db = getFirestore();
 
 const OUTPUT_DIR = path.join(process.cwd(), 'firestore_summary');
-const OUTPUT_FILE = path.join(OUTPUT_DIR, 'results_summary.csv');
+const SUMMARY_FILE = path.join(OUTPUT_DIR, 'results_summary.csv');
+const INTERACTION_FILE = path.join(OUTPUT_DIR, 'interaction_events.csv');
 const DELIMITER = ';';
 
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -65,6 +74,28 @@ function csvEscape(value) {
   }
 
   return text;
+}
+
+function writeCsv(filePath, rows) {
+  if (!rows.length) {
+    fs.writeFileSync(filePath, '\uFEFF', 'utf8');
+    return;
+  }
+
+  const columns = Object.keys(rows[0]);
+
+  const lines = [
+    columns.map(csvEscape).join(DELIMITER),
+    ...rows.map((row) =>
+      columns.map((column) => csvEscape(row[column])).join(DELIMITER)
+    ),
+  ];
+
+  fs.writeFileSync(
+    filePath,
+    '\uFEFF' + lines.join('\n'),
+    'utf8'
+  );
 }
 
 function toIso(value) {
@@ -209,13 +240,19 @@ async function main() {
       participantId: run.participantId || '',
       counterbalanceGroup: run.counterbalanceGroup ?? '',
       deviceId: run.deviceId || '',
+      deviceModel: run.deviceModel || '',
       testerId: run.testerId || '',
       createdAt: toIso(run.createdAt),
 
-      ageGroup: demographics.ageGroup || '',
-      gender: demographics.gender || '',
-      smartphoneOs: demographics.smartphoneOs || '',
-      photoSortingFrequency: demographics.photoSortingFrequency || '',
+      // Neue Version: exaktes Alter.
+      // ageGroup bleibt zusätzlich drin, damit ältere Testläufe weiterhin
+      // ohne Informationsverlust exportiert werden können.
+      age: demographics.age ?? '',
+      ageNotProvided: demographics.ageNotProvided ?? '',
+      ageGroup: demographics.ageGroup ?? '',
+      gender: demographics.gender ?? '',
+      smartphoneOs: demographics.smartphoneOs ?? '',
+      photoSortingFrequency: demographics.photoSortingFrequency ?? '',
 
       SA_photoSet: SA.photoSet,
       SA_position: SA.position,
@@ -271,40 +308,98 @@ async function main() {
       RB_playfulness: RB.playfulness,
       RB_comparison: RB.comparison,
 
-      overallPreference: finalQ.overallPreference || '',
-      independentPreference: finalQ.independentPreference || '',
-      seriesPreference: finalQ.seriesPreference || '',
-      perceivedSpeed: finalQ.perceivedSpeed || '',
-      perceivedControl: finalQ.perceivedControl || '',
-      perceivedEase: finalQ.perceivedEase || '',
-      ownPhotoPreference: finalQ.ownPhotoPreference || '',
-      comment: finalQ.comment || '',
+      // Bipolare Skala: -3 = Swipe, 0 = neutral, +3 = Raster.
+      // WICHTIG: ?? statt ||, damit der gültige Wert 0 nicht verloren geht.
+      overallPreference: finalQ.overallPreference ?? '',
+      independentPreference: finalQ.independentPreference ?? '',
+      seriesPreference: finalQ.seriesPreference ?? '',
+      perceivedSpeed: finalQ.perceivedSpeed ?? '',
+      perceivedControl: finalQ.perceivedControl ?? '',
+      perceivedEase: finalQ.perceivedEase ?? '',
+      ownPhotoPreference: finalQ.ownPhotoPreference ?? '',
+
+      preferenceScaleMin: finalQ.scaleMin ?? '',
+      preferenceScaleMax: finalQ.scaleMax ?? '',
+      preferenceScaleLeft: finalQ.scaleLeft ?? '',
+      preferenceScaleCenter: finalQ.scaleCenter ?? '',
+      preferenceScaleRight: finalQ.scaleRight ?? '',
+
+      interactionEventCount: (run.interactionEvents || []).length,
+      comment: finalQ.comment ?? '',
     });
   }
 
-  const columns = Object.keys(rows[0]);
+  writeCsv(SUMMARY_FILE, rows);
 
-  const lines = [
-    columns.map(csvEscape).join(DELIMITER),
-    ...rows.map((row) =>
-      columns.map((column) => csvEscape(row[column])).join(DELIMITER)
-    ),
-  ];
+  // Detaillierter Export aller Präsentations-/Interaktionsereignisse.
+  // Damit bleiben Einzelbildzeiten und das tatsächliche Auftauchen der Bilder
+  // für die spätere Analyse erhalten.
+  const interactionRows = [];
 
-  fs.writeFileSync(
-    OUTPUT_FILE,
-    '\uFEFF' + lines.join('\n'),
-    'utf8'
-  );
+  for (const run of runs) {
+    const events = [...(run.interactionEvents || [])].sort(
+      (a, b) => (a.sequence ?? 0) - (b.sequence ?? 0)
+    );
 
-  console.log(`✓ ${OUTPUT_FILE}`);
+    for (const event of events) {
+      interactionRows.push({
+        participantId: run.participantId || '',
+        counterbalanceGroup: run.counterbalanceGroup ?? '',
+        deviceId: run.deviceId || '',
+        deviceModel: run.deviceModel || '',
+
+        sequence: event.sequence ?? '',
+        timestamp: toIso(event.timestamp),
+
+        conditionId: event.conditionId ?? '',
+        interfaceType: event.interfaceType ?? '',
+        taskType: event.taskType ?? '',
+        eventType: event.eventType ?? '',
+
+        photoId: event.photoId ?? '',
+        seriesId: event.seriesId ?? '',
+        difficulty: event.difficulty ?? '',
+
+        presentationIndex: event.presentationIndex ?? '',
+        seriesIndex: event.seriesIndex ?? '',
+        roundNumber: event.roundNumber ?? '',
+        positionInRound: event.positionInRound ?? '',
+        gridPosition: event.gridPosition ?? '',
+
+        action: event.action ?? '',
+        previousAction: event.previousAction ?? '',
+        previousPhotoId: event.previousPhotoId ?? '',
+
+        durationMs: event.durationMs ?? '',
+        durationSec:
+          typeof event.durationMs === 'number'
+            ? round(event.durationMs / 1000, 3)
+            : '',
+
+        visibleDurationMs: event.visibleDurationMs ?? '',
+        visibleDurationSec:
+          typeof event.visibleDurationMs === 'number'
+            ? round(event.visibleDurationMs / 1000, 3)
+            : '',
+
+        expectedAction: event.expectedAction ?? '',
+        isBestInSeries: event.isBestInSeries ?? '',
+      });
+    }
+  }
+
+  writeCsv(INTERACTION_FILE, interactionRows);
+
+  console.log(`✓ ${SUMMARY_FILE}`);
+  console.log(`✓ ${INTERACTION_FILE}`);
   console.log(`✓ ${rows.length} Versuchsperson(en)`);
+  console.log(`✓ ${interactionRows.length} Interaktionsereignis(se)`);
   console.log('');
   console.log('Erwartung pro vollständigem Datensatz:');
   console.log('  SA = 20 Entscheidungen');
   console.log('  RA = 20 Entscheidungen');
-  console.log('  SB = 6 Entscheidungen');
-  console.log('  RB = 6 Entscheidungen');
+  console.log('  SB = 8 Serienentscheidungen (4 Easy + 4 Hard)');
+  console.log('  RB = 8 Serienentscheidungen (4 Easy + 4 Hard)');
 }
 
 main()
