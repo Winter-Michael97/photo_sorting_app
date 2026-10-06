@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/interaction_event.dart';
 import '../models/photo_item.dart';
 
 class GridSeriesScreen extends StatefulWidget {
@@ -10,7 +11,8 @@ class GridSeriesScreen extends StatefulWidget {
   final int totalSeriesCount;
 
   final void Function(String seriesId, PhotoItem selectedPhoto)
-  onSeriesCompleted;
+      onSeriesCompleted;
+  final ValueChanged<InteractionEventDraft> onInteractionEvent;
 
   const GridSeriesScreen({
     super.key,
@@ -19,6 +21,7 @@ class GridSeriesScreen extends StatefulWidget {
     required this.currentSeriesIndex,
     required this.totalSeriesCount,
     required this.onSeriesCompleted,
+    required this.onInteractionEvent,
   });
 
   @override
@@ -28,10 +31,216 @@ class GridSeriesScreen extends StatefulWidget {
 class _GridSeriesScreenState extends State<GridSeriesScreen> {
   PhotoItem? _selectedPhoto;
 
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _gridViewportKey = GlobalKey();
+  late final Map<String, GlobalKey> _tileKeys;
+
+  final Map<String, DateTime> _firstShownAt = <String, DateTime>{};
+  final Map<String, DateTime> _visibleSince = <String, DateTime>{};
+  final Map<String, int> _visibleDurationMs = <String, int>{};
+
+  bool _visibilityCheckScheduled = false;
+  bool _exposureFinalized = false;
+  int _shownCounter = 0;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _tileKeys = {
+      for (final photo in widget.photos) photo.id: GlobalKey(),
+    };
+
+    _scrollController.addListener(_scheduleVisibilityCheck);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _updateVisibility();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_scheduleVisibilityCheck);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scheduleVisibilityCheck() {
+    if (_visibilityCheckScheduled || !mounted) {
+      return;
+    }
+
+    _visibilityCheckScheduled = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _visibilityCheckScheduled = false;
+
+      if (mounted) {
+        _updateVisibility();
+      }
+    });
+  }
+
+  double _visibleFraction(RenderBox tileBox, Rect viewportRect) {
+    final tileOrigin = tileBox.localToGlobal(Offset.zero);
+    final tileRect = tileOrigin & tileBox.size;
+
+    if (!tileRect.overlaps(viewportRect)) {
+      return 0;
+    }
+
+    final intersection = tileRect.intersect(viewportRect);
+    final tileArea = tileRect.width * tileRect.height;
+
+    if (tileArea <= 0) {
+      return 0;
+    }
+
+    return (intersection.width * intersection.height) / tileArea;
+  }
+
+  void _updateVisibility({DateTime? now}) {
+    if (_exposureFinalized) {
+      return;
+    }
+
+    final viewportContext = _gridViewportKey.currentContext;
+    final viewportObject = viewportContext?.findRenderObject();
+
+    if (viewportObject is! RenderBox || !viewportObject.hasSize) {
+      return;
+    }
+
+    final timestamp = now ?? DateTime.now();
+    final viewportOrigin = viewportObject.localToGlobal(Offset.zero);
+    final viewportRect = viewportOrigin & viewportObject.size;
+
+    for (int index = 0; index < widget.photos.length; index++) {
+      final photo = widget.photos[index];
+      final tileContext = _tileKeys[photo.id]?.currentContext;
+      final tileObject = tileContext?.findRenderObject();
+
+      final isVisible = tileObject is RenderBox &&
+          tileObject.hasSize &&
+          _visibleFraction(tileObject, viewportRect) >= 0.5;
+
+      final wasVisible = _visibleSince.containsKey(photo.id);
+
+      if (isVisible && !wasVisible) {
+        _visibleSince[photo.id] = timestamp;
+
+        if (!_firstShownAt.containsKey(photo.id)) {
+          _firstShownAt[photo.id] = timestamp;
+          _shownCounter++;
+
+          widget.onInteractionEvent(
+            InteractionEventDraft(
+              eventType: 'photo_shown',
+              timestamp: timestamp,
+              photoId: photo.id,
+              seriesId: widget.seriesId,
+              presentationIndex: _shownCounter,
+              seriesIndex: widget.currentSeriesIndex,
+              gridPosition: index + 1,
+              isBestInSeries: photo.isBestInSeries,
+            ),
+          );
+        }
+      } else if (!isVisible && wasVisible) {
+        _closeVisibleInterval(photo.id, timestamp);
+      }
+    }
+  }
+
+  void _closeVisibleInterval(String photoId, DateTime now) {
+    final startedAt = _visibleSince.remove(photoId);
+
+    if (startedAt == null) {
+      return;
+    }
+
+    final elapsed = now.difference(startedAt).inMilliseconds;
+    _visibleDurationMs[photoId] =
+        (_visibleDurationMs[photoId] ?? 0) + elapsed;
+  }
+
+  int _currentVisibleDuration(String photoId, DateTime now) {
+    var duration = _visibleDurationMs[photoId] ?? 0;
+    final activeSince = _visibleSince[photoId];
+
+    if (activeSince != null) {
+      duration += now.difference(activeSince).inMilliseconds;
+    }
+
+    return duration;
+  }
+
   void _selectPhoto(PhotoItem photo) {
+    final now = DateTime.now();
+    _updateVisibility(now: now);
+
+    final previousPhoto = _selectedPhoto;
+
     setState(() {
       _selectedPhoto = photo;
     });
+
+    final gridPosition = widget.photos.indexWhere((p) => p.id == photo.id) + 1;
+    final firstShownAt = _firstShownAt[photo.id];
+
+    widget.onInteractionEvent(
+      InteractionEventDraft(
+        eventType: 'grid_selection_changed',
+        timestamp: now,
+        photoId: photo.id,
+        seriesId: widget.seriesId,
+        seriesIndex: widget.currentSeriesIndex,
+        gridPosition: gridPosition,
+        action: 'select',
+        previousPhotoId: previousPhoto?.id,
+        durationMs: firstShownAt == null
+            ? null
+            : now.difference(firstShownAt).inMilliseconds,
+        visibleDurationMs: _currentVisibleDuration(photo.id, now),
+        isBestInSeries: photo.isBestInSeries,
+      ),
+    );
+  }
+
+  void _finalizeExposure(DateTime now) {
+    if (_exposureFinalized) {
+      return;
+    }
+
+    _updateVisibility(now: now);
+
+    for (final photoId in _visibleSince.keys.toList()) {
+      _closeVisibleInterval(photoId, now);
+    }
+
+    _exposureFinalized = true;
+
+    for (int index = 0; index < widget.photos.length; index++) {
+      final photo = widget.photos[index];
+
+      widget.onInteractionEvent(
+        InteractionEventDraft(
+          eventType: 'photo_exposure_summary',
+          timestamp: now,
+          photoId: photo.id,
+          seriesId: widget.seriesId,
+          seriesIndex: widget.currentSeriesIndex,
+          gridPosition: index + 1,
+          visibleDurationMs: _visibleDurationMs[photo.id] ?? 0,
+          durationMs: _firstShownAt[photo.id] == null
+              ? null
+              : now.difference(_firstShownAt[photo.id]!).inMilliseconds,
+          isBestInSeries: photo.isBestInSeries,
+        ),
+      );
+    }
   }
 
   void _confirmSelection() {
@@ -40,6 +249,21 @@ class _GridSeriesScreenState extends State<GridSeriesScreen> {
     if (selectedPhoto == null) {
       return;
     }
+
+    final now = DateTime.now();
+    _finalizeExposure(now);
+
+    widget.onInteractionEvent(
+      InteractionEventDraft(
+        eventType: 'grid_confirmed',
+        timestamp: now,
+        photoId: selectedPhoto.id,
+        seriesId: widget.seriesId,
+        seriesIndex: widget.currentSeriesIndex,
+        action: 'confirm_selection',
+        isBestInSeries: selectedPhoto.isBestInSeries,
+      ),
+    );
 
     widget.onSeriesCompleted(widget.seriesId, selectedPhoto);
   }
@@ -56,7 +280,6 @@ class _GridSeriesScreenState extends State<GridSeriesScreen> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              // ---------- Fortschritt ----------
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -75,9 +298,7 @@ class _GridSeriesScreenState extends State<GridSeriesScreen> {
               ),
 
               const SizedBox(height: 10),
-
               LinearProgressIndicator(value: progress),
-
               const SizedBox(height: 20),
 
               const Text(
@@ -94,35 +315,41 @@ class _GridSeriesScreenState extends State<GridSeriesScreen> {
               Text(
                 _selectedPhoto == null
                     ? 'Noch kein Foto ausgewählt'
-                    : 'Ausgewählt: ${_selectedPhoto!.id}',
+                    : 'Foto ausgewählt',
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 14),
               ),
 
               const SizedBox(height: 16),
 
-              // ---------- Foto-Raster ----------
               Expanded(
-                child: GridView.builder(
-                  itemCount: widget.photos.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.78,
-                  ),
-                  itemBuilder: (context, index) {
-                    final photo = widget.photos[index];
-                    final isSelected = _selectedPhoto?.id == photo.id;
+                child: Container(
+                  key: _gridViewportKey,
+                  child: GridView.builder(
+                    controller: _scrollController,
+                    itemCount: widget.photos.length,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.78,
+                    ),
+                    itemBuilder: (context, index) {
+                      final photo = widget.photos[index];
+                      final isSelected = _selectedPhoto?.id == photo.id;
 
-                    return _buildPhotoCard(photo, isSelected);
-                  },
+                      return KeyedSubtree(
+                        key: _tileKeys[photo.id],
+                        child: _buildPhotoCard(photo, isSelected),
+                      );
+                    },
+                  ),
                 ),
               ),
 
               const SizedBox(height: 16),
 
-              // ---------- Bestätigung ----------
               SizedBox(
                 width: double.infinity,
                 height: 52,
@@ -144,9 +371,7 @@ class _GridSeriesScreenState extends State<GridSeriesScreen> {
 
   Widget _buildPhotoCard(PhotoItem photo, bool isSelected) {
     return InkWell(
-      onTap: () {
-        _selectPhoto(photo);
-      },
+      onTap: () => _selectPhoto(photo),
       borderRadius: BorderRadius.circular(12),
       child: Card(
         clipBehavior: Clip.antiAlias,
@@ -158,45 +383,25 @@ class _GridSeriesScreenState extends State<GridSeriesScreen> {
             color: isSelected ? Colors.green : Colors.grey.shade300,
           ),
         ),
-        child: Column(
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            Expanded(
-              child: SizedBox(
-                width: double.infinity,
-                child: Image.asset(
-                  photo.assetPath,
-                  fit: BoxFit.cover,
-                ),
-              ),
+            Image.asset(
+              photo.assetPath,
+              fit: BoxFit.cover,
             ),
-
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Row(
-                children: [
-                  Icon(
-                    isSelected
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
+            if (isSelected)
+              const Positioned(
+                top: 8,
+                right: 8,
+                child: CircleAvatar(
+                  radius: 15,
+                  child: Icon(
+                    Icons.check,
                     size: 20,
                   ),
-
-                  const SizedBox(width: 6),
-
-                  Expanded(
-                    child: Text(
-                      photo.id,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
           ],
         ),
       ),

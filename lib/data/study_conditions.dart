@@ -28,7 +28,7 @@ List<PhotoItem> _buildSeriesPhotos({
 }) {
   final photos = <PhotoItem>[];
 
-  for (int series = 1; series <= 6; series++) {
+  for (int series = 1; series <= 4; series++) {
     final seriesStr = series.toString().padLeft(2, '0');
     final seriesId = '${prefix}_s$seriesStr';
     final bestPhotoNumber = bestPhotoBySeries[series];
@@ -39,7 +39,7 @@ List<PhotoItem> _buildSeriesPhotos({
       );
     }
 
-    for (int photo = 1; photo <= 5; photo++) {
+    for (int photo = 1; photo <= 4; photo++) {
       final photoStr = photo.toString().padLeft(2, '0');
 
       photos.add(
@@ -60,62 +60,48 @@ List<PhotoItem> _buildSeriesPhotos({
 final List<PhotoItem> clearA1Photos = _buildIndependentPhotos(
   folder: 'clear_a1',
   prefix: 'a1',
-  keepNumbers: {
-    1,
-    4,
-    5,
-    7,
-    10,
-    12,
-    13,
-    15,
-    18,
-    19,
-  },
+  keepNumbers: {1, 4, 5, 7, 10, 12, 13, 15, 18, 19},
 );
 
 final List<PhotoItem> clearA2Photos = _buildIndependentPhotos(
   folder: 'clear_a2',
   prefix: 'a2',
-  keepNumbers: {
-    2,
-    3,
-    5,
-    8,
-    9,
-    11,
-    13,
-    16,
-    18,
-    19,
-  },
+  keepNumbers: {2, 3, 5, 8, 9, 11, 13, 16, 18, 19},
 );
 
-final List<PhotoItem> seriesB1Photos = _buildSeriesPhotos(
-  folder: 'series_b1',
-  prefix: 'b1',
-  bestPhotoBySeries: {
-    1: 3, // b1_s01_03
-    2: 3, // b1_s02_03
-    3: 5, // b1_s03_05
-    4: 2, // b1_s04_02
-    5: 4, // b1_s05_04
-    6: 3, // b1_s06_03
-  },
+final List<PhotoItem> seriesB1EasyPhotos = _buildSeriesPhotos(
+  folder: 'series_b1_easy',
+  prefix: 'b1_e',
+  bestPhotoBySeries: {1: 3, 2: 2, 3: 4, 4: 1},
 );
 
-final List<PhotoItem> seriesB2Photos = _buildSeriesPhotos(
-  folder: 'series_b2',
-  prefix: 'b2',
-  bestPhotoBySeries: {
-    1: 2, // b2_s01_02
-    2: 5, // b2_s02_05
-    3: 1, // b2_s03_01
-    4: 4, // b2_s04_04
-    5: 3, // b2_s05_03
-    6: 2, // b2_s06_02
-  },
+final List<PhotoItem> seriesB1HardPhotos = _buildSeriesPhotos(
+  folder: 'series_b1_hard',
+  prefix: 'b1_h',
+  bestPhotoBySeries: {1: 3, 2: 2, 3: 3, 4: 1},
 );
+
+final List<PhotoItem> seriesB2EasyPhotos = _buildSeriesPhotos(
+  folder: 'series_b2_easy',
+  prefix: 'b2_e',
+  bestPhotoBySeries: {1: 4, 2: 1, 3: 3, 4: 4},
+);
+
+final List<PhotoItem> seriesB2HardPhotos = _buildSeriesPhotos(
+  folder: 'series_b2_hard',
+  prefix: 'b2_h',
+  bestPhotoBySeries: {1: 2, 2: 3, 3: 2, 4: 1},
+);
+
+final List<PhotoItem> seriesB1Photos = [
+  ...seriesB1EasyPhotos,
+  ...seriesB1HardPhotos,
+];
+
+final List<PhotoItem> seriesB2Photos = [
+  ...seriesB2EasyPhotos,
+  ...seriesB2HardPhotos,
+];
 
 final List<StudyCondition> studyConditions = [
   StudyCondition(

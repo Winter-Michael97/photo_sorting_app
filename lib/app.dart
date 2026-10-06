@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import 'data/study_conditions.dart';
@@ -7,7 +9,9 @@ import 'models/sorting_decision.dart';
 import 'models/study_condition.dart';
 import 'models/study_session_info.dart';
 import 'models/condition_timing.dart';
+import 'models/interaction_event.dart';
 
+import 'screens/device_selection_screen.dart';
 import 'screens/consent_screen.dart';
 import 'screens/condition_intro_screen.dart';
 import 'screens/swipe_independent_screen.dart';
@@ -23,6 +27,7 @@ import 'screens/study_complete_screen.dart';
 import 'services/firestore_service.dart';
 
 enum AppStep {
+  deviceSelection,
   consent,
   conditionIntro,
   swipeIndependent,
@@ -58,18 +63,22 @@ class StudyAppShell extends StatefulWidget {
 }
 
 class _StudyAppShellState extends State<StudyAppShell> {
-  AppStep _currentStep = AppStep.consent;
+  AppStep _currentStep = AppStep.deviceSelection;
 
   StudySessionInfo? _sessionInfo;
 
   bool _consentAccepted = false;
   DateTime? _consentAcceptedAt;
 
-  // Die Studie startet direkt mit dem Consent-Screen.
-  // Geräte-/Versuchsleiter-Auswahl ist für die Studie nicht erforderlich.
-  static const String _deviceId = 'study_device';
+  // Vor dem Consent wählt der Versuchsleiter das verwendete Studiengerät.
+  String? _selectedDeviceId;
+  String? _selectedDeviceModel;
+
+  // Aktuell wird nicht zwischen einzelnen Versuchsleitenden unterschieden.
   static const String _testerId = 'study_team';
-  static const String _consentVersion = '2026-09-21';
+
+  // Consent-Text wurde am 06.10.2026 angepasst (Teilnehmendenzahl).
+  static const String _consentVersion = '2026-10-06';
 
   int _currentConditionIndex = 0;
   int _currentSwipePhotoIndex = 0;
@@ -79,14 +88,17 @@ class _StudyAppShellState extends State<StudyAppShell> {
   int _counterbalanceGroup = 1;
 
   final List<SortingDecision> _decisions = [];
+  final List<InteractionEvent> _interactionEvents = [];
   final Map<String, Map<String, int>> _subjectiveRatings = {};
   final List<ConditionTiming> _conditionTimings = [];
   final Map<String, dynamic> _finalQuestionnaire = {};
   final Map<String, dynamic> _demographics = {};
 
+  int _nextInteractionEventSequence = 1;
+
   final FirestoreService _firestoreService = FirestoreService();
 
-  static const String _appVersion = '1.0.0';
+  static const String _appVersion = '1.1.0';
 
   bool _isExporting = false;
 
@@ -160,33 +172,108 @@ class _StudyAppShellState extends State<StudyAppShell> {
     );
   }
 
-  List<StudyCondition> _buildCounterbalancedStudyConditions(int group) {
-    final saBase = studyConditions.firstWhere((condition) => condition.id == 'SA');
-    final raBase = studyConditions.firstWhere((condition) => condition.id == 'RA');
-    final sbBase = studyConditions.firstWhere((condition) => condition.id == 'SB');
-    final rbBase = studyConditions.firstWhere((condition) => condition.id == 'RB');
+  List<PhotoItem> _shuffleIndependentPhotos(
+    List<PhotoItem> photos,
+    Random random,
+  ) {
+    final shuffled = List<PhotoItem>.from(photos);
+    shuffled.shuffle(random);
+    return shuffled;
+  }
+
+  List<PhotoItem> _shuffleSeriesPhotos(
+    List<PhotoItem> photos,
+    Random random,
+  ) {
+    final grouped = <String, List<PhotoItem>>{};
+
+    for (final photo in photos) {
+      final seriesId = photo.seriesId;
+
+      if (seriesId == null) {
+        continue;
+      }
+
+      grouped.putIfAbsent(seriesId, () => <PhotoItem>[]);
+      grouped[seriesId]!.add(photo);
+    }
+
+    // Easy und Hard bleiben bewusst getrennt:
+    // zuerst alle Easy-Serien, danach alle Hard-Serien.
+    // Innerhalb der beiden Blöcke werden die Serien randomisiert.
+    final easySeriesIds = grouped.keys
+        .where((seriesId) => seriesId.contains('_e_'))
+        .toList()
+      ..shuffle(random);
+
+    final hardSeriesIds = grouped.keys
+        .where((seriesId) => seriesId.contains('_h_'))
+        .toList()
+      ..shuffle(random);
+
+    final result = <PhotoItem>[];
+
+    void addSeries(List<String> seriesIds) {
+      for (final seriesId in seriesIds) {
+        // Auch die vier Fotos innerhalb jeder Serie randomisieren.
+        final seriesPhotos = List<PhotoItem>.from(grouped[seriesId]!);
+        seriesPhotos.shuffle(random);
+        result.addAll(seriesPhotos);
+      }
+    }
+
+    addSeries(easySeriesIds);
+    addSeries(hardSeriesIds);
+
+    return result;
+  }
+
+  List<StudyCondition> _buildCounterbalancedStudyConditions(
+    int group,
+    String participantId,
+  ) {
+    final saBase =
+        studyConditions.firstWhere((condition) => condition.id == 'SA');
+    final raBase =
+        studyConditions.firstWhere((condition) => condition.id == 'RA');
+    final sbBase =
+        studyConditions.firstWhere((condition) => condition.id == 'SB');
+    final rbBase =
+        studyConditions.firstWhere((condition) => condition.id == 'RB');
 
     final normalSetAssignment = group == 1 || group == 3;
 
-    final sa = _copyConditionWithPhotos(
-      saBase,
+    final match = RegExp(r'\d+').firstMatch(participantId);
+    final participantNumber =
+        int.tryParse(match?.group(0) ?? '') ?? participantId.hashCode;
+
+    // A1/A2: alle 20 Clear-Fotos randomisieren.
+    final saPhotos = _shuffleIndependentPhotos(
       normalSetAssignment ? clearA1Photos : clearA2Photos,
+      Random(participantNumber * 100 + 1),
     );
 
-    final ra = _copyConditionWithPhotos(
-      raBase,
+    final raPhotos = _shuffleIndependentPhotos(
       normalSetAssignment ? clearA2Photos : clearA1Photos,
+      Random(participantNumber * 100 + 2),
     );
 
-    final sb = _copyConditionWithPhotos(
-      sbBase,
+    // B1/B2: zuerst 4 Easy-Serien, danach 4 Hard-Serien.
+    // Innerhalb beider Blöcke werden Serien und Fotos randomisiert.
+    final sbPhotos = _shuffleSeriesPhotos(
       normalSetAssignment ? seriesB1Photos : seriesB2Photos,
+      Random(participantNumber * 100 + 3),
     );
 
-    final rb = _copyConditionWithPhotos(
-      rbBase,
+    final rbPhotos = _shuffleSeriesPhotos(
       normalSetAssignment ? seriesB2Photos : seriesB1Photos,
+      Random(participantNumber * 100 + 4),
     );
+
+    final sa = _copyConditionWithPhotos(saBase, saPhotos);
+    final ra = _copyConditionWithPhotos(raBase, raPhotos);
+    final sb = _copyConditionWithPhotos(sbBase, sbPhotos);
+    final rb = _copyConditionWithPhotos(rbBase, rbPhotos);
 
     switch (group) {
       case 1:
@@ -218,19 +305,43 @@ class _StudyAppShellState extends State<StudyAppShell> {
     return ((participantNumber - 1) % 4) + 1;
   }
 
+  void _handleDeviceSelected({
+    required String deviceId,
+    required String deviceModel,
+  }) {
+    setState(() {
+      _selectedDeviceId = deviceId;
+      _selectedDeviceModel = deviceModel;
+      _currentStep = AppStep.consent;
+    });
+
+    debugPrint('Studiengerät ausgewählt: $deviceModel ($deviceId)');
+  }
+
   Future<void> _acceptConsentAndStart() async {
+    final deviceId = _selectedDeviceId;
+    final deviceModel = _selectedDeviceModel;
+
+    if (deviceId == null || deviceModel == null) {
+      throw StateError(
+        'Vor dem Consent muss ein Studiengerät ausgewählt werden.',
+      );
+    }
+
     // Die Teilnehmer-ID wird automatisch erst NACH der Einwilligung erzeugt:
     // P001, P002, P003, ...
     final participantId = await _firestoreService.getNextParticipantId();
 
     final sessionInfo = StudySessionInfo(
       participantId: participantId,
-      deviceId: _deviceId,
+      deviceId: deviceId,
+      deviceModel: deviceModel,
       testerId: _testerId,
     );
 
     final group = _getCounterbalanceGroup(participantId);
-    final conditionOrder = _buildCounterbalancedStudyConditions(group);
+    final conditionOrder =
+        _buildCounterbalancedStudyConditions(group, participantId);
     final acceptedAt = DateTime.now();
 
     setState(() {
@@ -246,11 +357,13 @@ class _StudyAppShellState extends State<StudyAppShell> {
       _currentSeriesIndex = 0;
 
       _decisions.clear();
+      _interactionEvents.clear();
       _subjectiveRatings.clear();
       _conditionTimings.clear();
       _finalQuestionnaire.clear();
       _demographics.clear();
 
+      _nextInteractionEventSequence = 1;
       _currentConditionStartedAt = null;
       _isExporting = false;
 
@@ -258,6 +371,7 @@ class _StudyAppShellState extends State<StudyAppShell> {
     });
 
     debugPrint('Studie gestartet: $participantId');
+    debugPrint('Studiengerät: $deviceModel ($deviceId)');
     debugPrint('Einwilligung: $_consentAccepted');
     debugPrint('Counterbalance-Gruppe: $group');
     debugPrint(
@@ -293,6 +407,58 @@ class _StudyAppShellState extends State<StudyAppShell> {
     });
 
     debugPrint('Condition gestartet: ${condition.id}');
+  }
+
+  String? _difficultyFromSeriesId(String? seriesId) {
+    if (seriesId == null) {
+      return null;
+    }
+
+    if (seriesId.contains('_e_')) {
+      return 'easy';
+    }
+
+    if (seriesId.contains('_h_')) {
+      return 'hard';
+    }
+
+    return null;
+  }
+
+  void _handleInteractionEvent(InteractionEventDraft draft) {
+    final condition = _currentCondition;
+
+    final event = InteractionEvent(
+      sequence: _nextInteractionEventSequence++,
+      participantId: _sessionInfo?.participantId ?? 'unknown',
+      conditionId: condition.id,
+      interfaceType: condition.interfaceType.name,
+      taskType: condition.taskType.name,
+      eventType: draft.eventType,
+      timestamp: draft.timestamp,
+      photoId: draft.photoId,
+      seriesId: draft.seriesId,
+      difficulty: _difficultyFromSeriesId(draft.seriesId),
+      presentationIndex: draft.presentationIndex,
+      seriesIndex: draft.seriesIndex,
+      roundNumber: draft.roundNumber,
+      positionInRound: draft.positionInRound,
+      gridPosition: draft.gridPosition,
+      action: draft.action,
+      previousAction: draft.previousAction,
+      previousPhotoId: draft.previousPhotoId,
+      durationMs: draft.durationMs,
+      visibleDurationMs: draft.visibleDurationMs,
+      expectedAction: draft.expectedAction,
+      isBestInSeries: draft.isBestInSeries,
+    );
+
+    _interactionEvents.add(event);
+
+    debugPrint(
+      'Interaction ${event.sequence}: ${event.eventType}, '
+      '${event.photoId ?? '-'}, ${event.durationMs ?? '-'} ms',
+    );
   }
 
   void _handleSwipeKeep(PhotoItem photo) {
@@ -519,11 +685,13 @@ class _StudyAppShellState extends State<StudyAppShell> {
       final documentId = await _firestoreService.saveStudyRun(
         participantId: sessionInfo.participantId,
         deviceId: sessionInfo.deviceId,
+        deviceModel: sessionInfo.deviceModel,
         testerId: sessionInfo.testerId,
         appVersion: _appVersion,
         counterbalanceGroup: _counterbalanceGroup,
         conditionOrder: _conditionOrder,
         decisions: _decisions,
+        interactionEvents: _interactionEvents,
         subjectiveRatings: _subjectiveRatings,
         conditionTimings: _conditionTimings,
         finalQuestionnaire:
@@ -568,6 +736,11 @@ class _StudyAppShellState extends State<StudyAppShell> {
   @override
   Widget build(BuildContext context) {
     switch (_currentStep) {
+      case AppStep.deviceSelection:
+        return DeviceSelectionScreen(
+          onContinue: _handleDeviceSelected,
+        );
+
       case AppStep.consent:
         return ConsentScreen(
           onAccept: _acceptConsentAndStart,
@@ -599,6 +772,7 @@ class _StudyAppShellState extends State<StudyAppShell> {
           totalCount: _currentCondition.photos.length,
           onKeep: _handleSwipeKeep,
           onDiscard: _handleSwipeDiscard,
+          onInteractionEvent: _handleInteractionEvent,
         );
 
       case AppStep.gridIndependent:
@@ -613,6 +787,7 @@ class _StudyAppShellState extends State<StudyAppShell> {
           photos: _currentCondition.photos,
           onDecisionChanged: _handleGridDecisionChanged,
           onConfirm: _handleGridConfirm,
+          onInteractionEvent: _handleInteractionEvent,
         );
 
       case AppStep.swipeSeries:
@@ -636,6 +811,7 @@ class _StudyAppShellState extends State<StudyAppShell> {
           currentSeriesIndex: _currentSeriesIndex + 1,
           totalSeriesCount: seriesGroups.length,
           onSeriesCompleted: _handleSwipeSeriesCompleted,
+          onInteractionEvent: _handleInteractionEvent,
         );
 
       case AppStep.gridSeries:
@@ -659,6 +835,7 @@ class _StudyAppShellState extends State<StudyAppShell> {
           currentSeriesIndex: _currentSeriesIndex + 1,
           totalSeriesCount: seriesGroups.length,
           onSeriesCompleted: _handleGridSeriesCompleted,
+          onInteractionEvent: _handleInteractionEvent,
         );
 
       case AppStep.conditionComplete:

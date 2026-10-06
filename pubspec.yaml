@@ -32,8 +32,8 @@ flutter:
   assets:
     - assets/test_images/clear_a1/
     - assets/test_images/clear_a2/
-    - assets/test_images/series_b1/
-    - assets/test_images/series_b2/
-    - assets/consent/consent_page_1.png
-    - assets/consent/consent_page_2.png
-    - assets/consent/study_consent.pdf
+    - assets/test_images/series_b1_easy/
+    - assets/test_images/series_b1_hard/
+    - assets/test_images/series_b2_easy/
+    - assets/test_images/series_b2_hard/
+    - assets/consent/
